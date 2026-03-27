@@ -1,3 +1,4 @@
+import requests
 from custom_requester.custom_requester import CustomRequester
 from constants import BASE_MOVIES_URL, MOVIES_ENDPOINT
 
@@ -7,16 +8,17 @@ load_dotenv()
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 
+from http import HTTPStatus
 
 class MoviesAPI(CustomRequester):
     """
       Класс для работы с API фильмов.
       """
 
-    def __init__(self, session):
+    def __init__(self, session: requests.Session):
         super().__init__(session=session, base_url=BASE_MOVIES_URL)
 
-    def get_movies(self, params=None, expected_status=200):
+    def get_movies(self, params: dict = None, expected_status: HTTPStatus = HTTPStatus.OK):
         """
         Получение списка афиш фильмов.
         :param expected_status: Ожидаемый статус-код.
@@ -28,7 +30,7 @@ class MoviesAPI(CustomRequester):
             expected_status=expected_status
         )
 
-    def create_movie(self, movie_data, expected_status=201):
+    def create_movie(self, movie_data: dict, expected_status: HTTPStatus = HTTPStatus.CREATED):
         """
         Создание афиши фильма.
         :param movie_data: Данные афиши фильма.
@@ -41,7 +43,7 @@ class MoviesAPI(CustomRequester):
             expected_status=expected_status
         )
     
-    def get_movie(self, movie_id, expected_status=200):
+    def get_movie(self, movie_id: int, expected_status: HTTPStatus = HTTPStatus.OK):
         """
         Получение информации о фильме.
         :param movie_id: ID афиши фильма.
@@ -53,7 +55,7 @@ class MoviesAPI(CustomRequester):
             expected_status=expected_status
         )
     
-    def change_movie(self, movie_id, change_movie_data, expected_status=200):
+    def change_movie(self, movie_id: int, change_movie_data: dict, expected_status: HTTPStatus = HTTPStatus.OK):
         """
         Редактирование афиши фильма.
         :param movie_id: ID афиши фильма.
@@ -67,7 +69,7 @@ class MoviesAPI(CustomRequester):
             expected_status=expected_status
         )
 
-    def delete_movie(self, movie_id, expected_status=200):
+    def delete_movie(self, movie_id: int, expected_status: HTTPStatus = HTTPStatus.OK):
         """
         Удаление афиши фильма.
         :param movie_id: ID афиши фильма.

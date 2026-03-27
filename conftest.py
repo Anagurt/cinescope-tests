@@ -1,22 +1,8 @@
 import requests
 import pytest
-
-from constants import (
-    BASE_AUTH_URL,
-    BASE_MOVIES_URL,
-    HEADERS,
-    LOGIN_ENDPOINT,
-    REGISTER_ENDPOINT
-)
-from custom_requester.custom_requester import CustomRequester
+from http import HTTPStatus
 from utils.data_generator import DataGenerator
 from clients.api_manager import ApiManager
-
-import os
-from dotenv import load_dotenv
-load_dotenv()
-ADMIN_EMAIL = os.getenv("ADMIN_EMAIL")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 
 
 @pytest.fixture(scope="session")
@@ -37,16 +23,6 @@ def api_manager(session):
 
 
 # AuthAPI фикстуры
-@pytest.fixture(scope="session")
-def auth_requester():
-    """
-    Фикстура для создания экземпляра CustomRequester для auth_API.
-    """
-    session = requests.Session()
-    session.headers.update(HEADERS)
-    return CustomRequester(session=session, base_url=BASE_AUTH_URL)
-
-
 @pytest.fixture()
 def new_user():
     random_email = DataGenerator.generate_random_email()
@@ -59,7 +35,6 @@ def new_user():
         "passwordRepeat": random_password,
         "roles": ["USER"]
     }
-
 
 @pytest.fixture(scope="session")
 def test_user():
@@ -77,48 +52,51 @@ def test_user():
         "roles": ["USER"]
     }
 
-
 @pytest.fixture(scope="session")
-def registered_user(auth_requester, test_user):
+def registered_user(api_manager: ApiManager, test_user: dict):
     """
     Фикстура для регистрации и получения данных зарегистрированного пользователя.
     """
-    response = auth_requester.send_request(
-        method="POST",
-        endpoint=REGISTER_ENDPOINT,
-        data=test_user,
-        expected_status=201
-    )
+    response = api_manager.auth_api.register_user(test_user, expected_status=HTTPStatus.CREATED)
     response_data = response.json()
     registered_user = test_user.copy()
     registered_user["id"] = response_data["id"]
     return registered_user
 
+@pytest.fixture(scope="session")
+def authorized_registered_user(api_manager: ApiManager, registered_user: dict):
+    api_manager.auth_api.authenticate((registered_user["email"], registered_user["password"]))
+    return api_manager
 
 @pytest.fixture(scope="session")
-def auth_session(auth_requester, registered_user):
-    """
-    Фикстура для авторизованного состояния пользователя.
-    """
-    login_data = {
-        "email": registered_user["email"],
-        "password": registered_user["password"]
-    }
-    response = auth_requester.send_request(
-        method = "POST",
-        endpoint = LOGIN_ENDPOINT,
-        data=login_data,
-        expected_status = 200
-    )
-    token = response.json().get("accessToken")
-    session = requests.Session()
-    session.headers.update(HEADERS)
-    session.headers.update({"Authorization": f"Bearer {token}"})
-    return session
+def authorized_super_admin(api_manager: ApiManager):
+    api_manager.auth_api.authenticate_super_admin()
+    return api_manager
+
+@pytest.fixture()
+def created_user_and_cleanup(api_manager: ApiManager, authorized_super_admin: ApiManager, new_user: dict):
+    response = api_manager.auth_api.register_user(new_user, expected_status=HTTPStatus.CREATED)
+    response_data = response.json()
+    created_user = new_user.copy()
+    created_user["id"] = response_data["id"]
+    yield created_user
+    api_manager.auth_api.authenticate_super_admin()
+    try:
+        authorized_super_admin.user_api.delete_user(created_user["id"], expected_status=HTTPStatus.OK)
+    except ValueError:
+        authorized_super_admin.user_api.delete_user(created_user["id"], expected_status=HTTPStatus.NOT_FOUND)
+
+@pytest.fixture()
+def users_to_cleanup(authorized_super_admin: ApiManager):
+    created_user_ids = []
+    yield created_user_ids
+    for user_id in created_user_ids:
+        authorized_super_admin.user_api.delete_user(user_id, expected_status=HTTPStatus.OK)
+
 
 # Фикстуры для генерации данных для негативных тестов AuthAPI
 @pytest.fixture()
-def empty_password_user(new_user):
+def empty_password_user(new_user: dict):
     """
     Фикстура для генерации пользователя с пустым полем пароля.
     """
@@ -127,7 +105,7 @@ def empty_password_user(new_user):
     return new_user
 
 @pytest.fixture()
-def empty_email_user(new_user):
+def empty_email_user(new_user: dict):
     """
     Фикстура для генерации пользователя с пустым полем email.
     """
@@ -135,7 +113,7 @@ def empty_email_user(new_user):
     return new_user
 
 @pytest.fixture()
-def user_with_email_at_less(new_user):
+def user_with_email_at_less(new_user: dict):
     """
     Фикстура для генерации пользователя с email без символа @.
     """
@@ -143,54 +121,13 @@ def user_with_email_at_less(new_user):
     return new_user
 
 @pytest.fixture()
-def empty_data_user(new_user):
+def empty_data_user(new_user: dict):
     """
     Фикстура для генерации пользователя с пустыми полями email и password.
     """
     new_user["email"] = ""
     new_user["password"] = ""
     return new_user
-
-# MoviesAPI фикстуры
-@pytest.fixture(scope="session")
-def movies_requester():
-    """
-    Фикстура для создания экземпляра CustomRequester для movies_API.
-    """
-    session = requests.Session()
-    session.headers.update(HEADERS)
-    return CustomRequester(session=session, base_url=BASE_MOVIES_URL)
-
-
-@pytest.fixture(scope="session")
-def user_movies_requester(auth_session):
-    """
-    CustomRequester для movies API под обычным пользователем
-    """
-    return CustomRequester(session=auth_session, base_url=BASE_MOVIES_URL)
-
-
-@pytest.fixture(scope="session")
-def super_admin_movies_requester(auth_requester):
-    """
-    Фикстура с авторизацией под админскими правами и созданием экземпляра CustomRequester для movies_API
-    """
-    login_data = {
-        "email": ADMIN_EMAIL,
-        "password": ADMIN_PASSWORD,
-    }
-    response = auth_requester.send_request(
-        method="POST",
-        endpoint=LOGIN_ENDPOINT,
-        data=login_data,
-        expected_status=200
-    )
-    token = response.json()["accessToken"]
-    session = requests.Session()
-    session.headers.update(HEADERS)
-    session.headers.update({"Authorization": f"Bearer {token}"})
-    return CustomRequester(session=session, base_url=BASE_MOVIES_URL)
-
 
 @pytest.fixture()
 def movie_data():
@@ -206,6 +143,37 @@ def movie_data():
         "published": True,
         "genreId": 1,
     }
+
+@pytest.fixture()
+def created_movie_and_cleanup(authorized_super_admin: ApiManager, movie_data: dict):
+    """
+    Фикстура для создания фильма и удаления его после теста.
+    """
+    authorized_super_admin.auth_api.authenticate_super_admin()
+    response = authorized_super_admin.movies_api.create_movie(movie_data, expected_status=HTTPStatus.CREATED)
+    response_data = response.json()
+    created_movie = movie_data.copy()
+    created_movie["id"] = response_data["id"]
+    yield created_movie
+    authorized_super_admin.auth_api.authenticate_super_admin()
+    try:
+        authorized_super_admin.movies_api.delete_movie(
+            created_movie["id"],
+            expected_status=HTTPStatus.OK
+        )
+    except ValueError:
+        authorized_super_admin.movies_api.delete_movie(
+            created_movie["id"],
+            expected_status=HTTPStatus.NOT_FOUND
+        )
+
+@pytest.fixture()
+def movies_to_cleanup(authorized_super_admin: ApiManager):
+    created_movie_ids = []
+    yield created_movie_ids
+    authorized_super_admin.auth_api.authenticate_super_admin()
+    for movie_id in created_movie_ids:
+        authorized_super_admin.movies_api.delete_movie(movie_id, expected_status=HTTPStatus.OK)
 
 @pytest.fixture()
 def change_movie_data():
@@ -224,7 +192,6 @@ def change_movie_data():
 
 
 # Фикстуры для генерации данных для негативных тестов MoviesAPI
-
 @pytest.fixture()
 def invalid_movie_data():
     """
@@ -241,7 +208,7 @@ def invalid_movie_data():
     }
 
 @pytest.fixture()
-def empty_name_movie(movie_data):
+def empty_name_movie(movie_data: dict):
     """
     Фикстура для генерации данных для афиши фильма с пустым полем name.
     """

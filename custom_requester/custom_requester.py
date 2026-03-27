@@ -1,6 +1,8 @@
+import requests
 import json
 import logging
 import os
+from http import HTTPStatus
 
 class CustomRequester:
     """
@@ -11,7 +13,7 @@ class CustomRequester:
     "Accept": "application/json"
     }
 
-    def __init__(self, session, base_url):
+    def __init__(self, session: requests.Session, base_url: str):
         """
         Инициализация кастомного реквестера.
         :param session: Объект requests.Session.
@@ -23,7 +25,7 @@ class CustomRequester:
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.INFO)
 
-    def send_request(self, method, endpoint, data=None, params=None, expected_status=200, need_logging=True):
+    def send_request(self, method: str, endpoint: str, data: dict = None, params: dict = None, expected_status: HTTPStatus = HTTPStatus.OK, need_logging: bool = True):
         """
         Универсальный метод для отправки запросов.
         :param method: HTTP метод (GET, POST, PUT, DELETE и т.д.).
@@ -41,7 +43,7 @@ class CustomRequester:
             raise ValueError(f"Unexpected status code: {response.status_code}. Expected: {expected_status}")
         return response
 
-    def _update_session_headers(self, **kwargs):
+    def _update_session_headers(self, **kwargs: str):
         """
         Обновление заголовков сессии.
         :param kwargs: Дополнительные заголовки.
@@ -49,7 +51,7 @@ class CustomRequester:
         self.headers.update(kwargs)
         self.session.headers.update(self.headers)
 
-    def log_request_and_response(self, response):
+    def log_request_and_response(self, response: requests.Response):
         """
         Логирование запросов и ответов.
         :param response: Объект ответа requests.Response.

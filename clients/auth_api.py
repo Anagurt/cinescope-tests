@@ -1,3 +1,4 @@
+import requests
 from custom_requester.custom_requester import CustomRequester
 from constants import BASE_AUTH_URL, LOGIN_ENDPOINT, REGISTER_ENDPOINT
 
@@ -7,16 +8,17 @@ load_dotenv()
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 
+from http import HTTPStatus
 
 class AuthAPI(CustomRequester):
     """
       Класс для работы с аутентификацией.
       """
 
-    def __init__(self, session):
+    def __init__(self, session: requests.Session):
         super().__init__(session=session, base_url=BASE_AUTH_URL)
 
-    def register_user(self, user_data, expected_status=201):
+    def register_user(self, user_data: dict, expected_status: HTTPStatus = HTTPStatus.CREATED):
         """
         Регистрация нового пользователя.
         :param user_data: Данные пользователя.
@@ -29,7 +31,7 @@ class AuthAPI(CustomRequester):
             expected_status=expected_status
         )
 
-    def login_user(self, login_data, expected_status=200):
+    def login_user(self, login_data: dict, expected_status: HTTPStatus = HTTPStatus.OK):
         """
         Авторизация пользователя.
         :param login_data: Данные для логина.
@@ -43,7 +45,7 @@ class AuthAPI(CustomRequester):
         )
 
 
-    def authenticate(self, user_creds):
+    def authenticate(self, user_creds: tuple):
         login_data = {
             "email": user_creds[0],
             "password": user_creds[1]
