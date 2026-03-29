@@ -1,16 +1,19 @@
-import requests
 import json
 import logging
 import os
 from http import HTTPStatus
+from typing import Optional
+
+import requests
+
 
 class CustomRequester:
     """
     Кастомный реквестер для стандартизации и упрощения отправки HTTP-запросов.
     """
     base_headers = {
-    "Content-Type": "application/json",
-    "Accept": "application/json"
+        "Content-Type": "application/json",
+        "Accept": "application/json",
     }
 
     def __init__(self, session: requests.Session, base_url: str):
@@ -25,13 +28,21 @@ class CustomRequester:
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.INFO)
 
-    def send_request(self, method: str, endpoint: str, data: dict = None, params: dict = None, expected_status: HTTPStatus = HTTPStatus.OK, need_logging: bool = True):
+    def send_request(
+        self,
+        method: str,
+        endpoint: str,
+        data: dict = None,
+        params: dict = None,
+        expected_status: Optional[HTTPStatus] = HTTPStatus.OK,
+        need_logging: bool = True,
+    ):
         """
         Универсальный метод для отправки запросов.
         :param method: HTTP метод (GET, POST, PUT, DELETE и т.д.).
         :param endpoint: Эндпоинт (например, "/login").
         :param data: Тело запроса (JSON-данные).
-        :param expected_status: Ожидаемый статус-код (по умолчанию 200).
+        :param expected_status: Ожидаемый статус-код (по умолчанию 200). Если None — проверка не выполняется.
         :param need_logging: Флаг для логирования (по умолчанию True).
         :return: Объект ответа requests.Response.
         """
@@ -39,7 +50,7 @@ class CustomRequester:
         response = self.session.request(method, url, json=data, headers=self.headers, params=params)
         if need_logging:
             self.log_request_and_response(response)
-        if response.status_code != expected_status:
+        if expected_status is not None and response.status_code != expected_status:
             raise ValueError(f"Unexpected status code: {response.status_code}. Expected: {expected_status}")
         return response
 

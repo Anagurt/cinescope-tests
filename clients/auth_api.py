@@ -1,19 +1,23 @@
-import requests
-from custom_requester.custom_requester import CustomRequester
-from constants import BASE_AUTH_URL, LOGIN_ENDPOINT, REGISTER_ENDPOINT
-
-import os
-from dotenv import load_dotenv
-load_dotenv()
-ADMIN_EMAIL = os.getenv("ADMIN_EMAIL")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
+from __future__ import annotations
 
 from http import HTTPStatus
 
+import requests
+
+from constants import (
+    ADMIN_EMAIL,
+    ADMIN_PASSWORD,
+    BASE_AUTH_URL,
+    LOGIN_ENDPOINT,
+    REGISTER_ENDPOINT,
+)
+from custom_requester.custom_requester import CustomRequester
+
+
 class AuthAPI(CustomRequester):
     """
-      Класс для работы с аутентификацией.
-      """
+    Класс для работы с аутентификацией.
+    """
 
     def __init__(self, session: requests.Session):
         super().__init__(session=session, base_url=BASE_AUTH_URL)
@@ -28,7 +32,7 @@ class AuthAPI(CustomRequester):
             method="POST",
             endpoint=REGISTER_ENDPOINT,
             data=user_data,
-            expected_status=expected_status
+            expected_status=expected_status,
         )
 
     def login_user(self, login_data: dict, expected_status: HTTPStatus = HTTPStatus.OK):
@@ -41,33 +45,23 @@ class AuthAPI(CustomRequester):
             method="POST",
             endpoint=LOGIN_ENDPOINT,
             data=login_data,
-            expected_status=expected_status
+            expected_status=expected_status,
         )
 
+    def authenticate(self, user_creds: tuple[str, str] | None = None) -> None:
+        """
+        Логин и установка Bearer-токена в сессию.
+        :param user_creds: (email, password). Если None — логин под супер-админом.
+        """
+        if user_creds is None:
+            email, password = ADMIN_EMAIL, ADMIN_PASSWORD
+        else:
+            email, password = user_creds
 
-    def authenticate(self, user_creds: tuple):
-        login_data = {
-            "email": user_creds[0],
-            "password": user_creds[1]
-        }
-
+        login_data = {"email": email, "password": password}
         response = self.login_user(login_data).json()
-        if "accessToken" not in response:
+
+        if (token := response.get("accessToken")) is None:
             raise KeyError("token is missing")
 
-        token = response["accessToken"]
-        self._update_session_headers(**{"authorization": "Bearer " + token})
-
-    def authenticate_super_admin(self):
-        login_data = {
-            "email": ADMIN_EMAIL,
-            "password": ADMIN_PASSWORD
-        }
-
-        response = self.login_user(login_data).json()
-        if "accessToken" not in response:
-            raise KeyError("token is missing")
-
-        token = response["accessToken"]
-        self._update_session_headers(**{"authorization": "Bearer " + token})
-
+        self._update_session_headers(authorization=f"Bearer {token}")

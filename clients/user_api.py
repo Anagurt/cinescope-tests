@@ -1,7 +1,9 @@
-import requests
-from custom_requester.custom_requester import CustomRequester
-from constants import BASE_AUTH_URL
 from http import HTTPStatus
+
+import requests
+
+from constants import BASE_AUTH_URL
+from custom_requester.custom_requester import CustomRequester
 
 
 class UserAPI(CustomRequester):
@@ -21,7 +23,7 @@ class UserAPI(CustomRequester):
         return self.send_request(
             method="GET",
             endpoint=f"/user/{user_id}",
-            expected_status=expected_status
+            expected_status=expected_status,
         )
 
     def delete_user(self, user_id: int, expected_status: HTTPStatus = HTTPStatus.OK):
@@ -33,5 +35,5 @@ class UserAPI(CustomRequester):
         return self.send_request(
             method="DELETE",
             endpoint=f"/user/{user_id}",
-            expected_status=expected_status
+            expected_status=expected_status,
         )

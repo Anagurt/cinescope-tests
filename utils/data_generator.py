@@ -1,5 +1,6 @@
 import random
 import string
+
 from faker import Faker
 
 faker = Faker()
@@ -9,8 +10,7 @@ class DataGenerator:
 
     @staticmethod
     def generate_random_email():
-        random_string = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
-        return f"{random_string}@gmail.com"
+        return faker.email()
 
     @staticmethod
     def generate_random_name():
@@ -25,21 +25,7 @@ class DataGenerator:
         - Допустимые символы.
         - Длина от 8 до 20 символов.
         """
-        # Гарантируем наличие хотя бы одной буквы и одной цифры
-        letters = random.choices(string.ascii_letters)
-        digits = random.choices(string.digits)
-
-        # Дополняем пароль случайными символами из допустимого набора
-        special_chars = "?@#$%^&*|:"
-        all_chars = string.ascii_letters + string.digits + special_chars
-        remaining_length = random.randint(6, 18)  # Остальная длина пароля
-        remaining_chars = random.choices(all_chars, k=remaining_length)
-
-        # Перемешиваем пароль для рандомизации
-        password = list(letters + digits + remaining_chars)
-        random.shuffle(password)
-
-        return ''.join(password)
+        return faker.password(length=faker.random_int(min=8, max=20), special_chars=True, digits=True, upper_case=True, lower_case=True)
 
     @staticmethod
     def generate_random_name_movie():
