@@ -22,7 +22,7 @@ def _assert_create_movie_echoes_request(movie_data: dict, response_data: dict):
     assert not mismatches, "Поля create_movie не совпадают с запросом:\n" + "\n".join(mismatches)
 
 
-@allure.feature("Positive tests for movies API")
+@allure.feature("Позитивные тесты для movies API")
 class TestMoviesAPIPositive:
     @allure.story("Тест на получение списка афиш фильмов (под неавторизованным пользователем)")
     def test_get_movies_unauthorized_user(self, anonymous_api_manager: ApiManager):
@@ -81,12 +81,11 @@ class TestMoviesAPIPositive:
 
     @allure.story("Тест на изменение афиши фильма (под админскими правами)")
     def test_change_movie_by_super_admin(self, created_movie_and_cleanup: dict, authorized_super_admin: ApiManager):
-        response = authorized_super_admin.movies_api.get_movie(created_movie_and_cleanup["id"])
-        created_movie_data = response.json()
-        created_movie_id = created_movie_data.get("id")
-        assert created_movie_id is not None, "В ответе get_movie отсутствует поле id"
+        created_movie_id = created_movie_and_cleanup["id"]
         change_movie_data = created_movie_and_cleanup.copy()
-        change_movie_data["name"] = "Новый фильм"
+
+        new_name = "Новый фильм"
+        change_movie_data["name"] = new_name
 
         response_changed_movie = authorized_super_admin.movies_api.patch_movie(created_movie_id, change_movie_data)
         changed_movie_data = response_changed_movie.json()
@@ -94,8 +93,7 @@ class TestMoviesAPIPositive:
         changed_id = changed_movie_data.get("id")
         assert changed_id is not None, f"В ответе patch_movie созданного фильма с id={created_movie_id} отсутствует поле ID"
         assert created_movie_id == changed_id, f"id фильма не совпадает, ожидалось {created_movie_id}, в ответе {changed_id}"
-        assert created_movie_data["name"] != changed_movie_data["name"], "Название фильма совпадает с измененным"
-        
+        assert created_movie_and_cleanup["name"] != changed_movie_data["name"], "Название фильма совпадает с измененным"
 
     @allure.story("Тест на удаление афиши фильма (под админскими правами)")
     def test_delete_movie_by_super_admin(self, movie_data: dict, authorized_super_admin: ApiManager):    

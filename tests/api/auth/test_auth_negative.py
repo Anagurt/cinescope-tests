@@ -5,7 +5,7 @@ import allure
 from clients.api_manager import ApiManager
 
 
-@allure.feature("Negative tests for auth API")
+@allure.feature("Негативные тесты для auth API")
 class TestAuthAPINegative:
     @allure.story("Негативный тест на регистрацию пользователя с пустым полем пароля")
     def test_register_user_with_empty_password(self, api_manager: ApiManager, new_user: dict):

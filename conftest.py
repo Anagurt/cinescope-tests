@@ -188,35 +188,3 @@ def movies_to_cleanup(authorized_super_admin: ApiManager):
     for movie_id in dict.fromkeys(created_movie_ids):
         response = authorized_super_admin.movies_api.delete_movie(movie_id, expected_status=None)
         _delete_ok_or_gone(response, f"delete movie {movie_id} in movies_to_cleanup")
-
-
-# @pytest.fixture()
-# def change_movie_data():
-#     """
-#     Фикстура для генерации данных для изменения фильма.
-#     """
-#     return {
-#         "name": DataGenerator.generate_random_name_movie(),
-#         "imageUrl": "https://example.com/image.png",
-#         "price": DataGenerator.generate_random_price_movie(),
-#         "description": DataGenerator.generate_random_description_movie(),
-#         "location": "SPB",
-#         "published": True,
-#         "genreId": 1,
-#     }
-
-
-# @pytest.fixture()
-# def invalid_movie_data():
-#     """
-#     Фикстура для генерации некорректных данных для афиши фильма (негативные тесты).
-#     """
-    # return {
-    #     "name": "",
-    #     "imageUrl": "",
-    #     "price": -1,
-    #     "description": "",
-    #     "location": "",
-    #     "published": False,
-    #     "genreId": 0,
-    # }

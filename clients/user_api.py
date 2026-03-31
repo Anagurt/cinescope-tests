@@ -1,6 +1,6 @@
 from http import HTTPStatus
 
-import requests
+from requests import Session
 
 from constants import BASE_AUTH_URL
 from custom_requester.custom_requester import CustomRequester
@@ -11,7 +11,7 @@ class UserAPI(CustomRequester):
     Класс для работы с API пользователей.
     """
 
-    def __init__(self, session: requests.Session):
+    def __init__(self, session: Session):
         super().__init__(session=session, base_url=BASE_AUTH_URL)
 
     def get_user_info(self, user_id: int, expected_status: HTTPStatus = HTTPStatus.OK):

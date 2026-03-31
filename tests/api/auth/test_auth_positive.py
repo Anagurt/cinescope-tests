@@ -1,10 +1,8 @@
-from http import HTTPStatus
-
 import allure
 
 from clients.api_manager import ApiManager
 
-@allure.feature("Positive tests for auth API")
+@allure.feature("Позитивные тесты для auth API")
 class TestAuthAPIPositive:
     @allure.story("Тест на регистрацию пользователя")
     def test_register_user(self, api_manager: ApiManager, new_user: dict, users_to_cleanup: list):

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+
 from http import HTTPStatus
 
-import requests
+from requests import Session
 
 from constants import (
     ADMIN_EMAIL,
@@ -19,7 +20,7 @@ class AuthAPI(CustomRequester):
     Класс для работы с аутентификацией.
     """
 
-    def __init__(self, session: requests.Session):
+    def __init__(self, session: Session):
         super().__init__(session=session, base_url=BASE_AUTH_URL)
 
     def register_user(self, user_data: dict, expected_status: HTTPStatus = HTTPStatus.CREATED):
@@ -48,16 +49,12 @@ class AuthAPI(CustomRequester):
             expected_status=expected_status,
         )
 
-    def authenticate(self, user_creds: tuple[str, str] | None = None) -> None:
+    def authenticate(self, user_creds: tuple[str, str] = (ADMIN_EMAIL, ADMIN_PASSWORD)):
         """
         Логин и установка Bearer-токена в сессию.
-        :param user_creds: (email, password). Если None — логин под супер-админом.
+        :param user_creds: Если параметры не переданы — логинится под супер-админом.
         """
-        if user_creds is None:
-            email, password = ADMIN_EMAIL, ADMIN_PASSWORD
-        else:
-            email, password = user_creds
-
+        email, password = user_creds
         login_data = {"email": email, "password": password}
         response = self.login_user(login_data).json()
 

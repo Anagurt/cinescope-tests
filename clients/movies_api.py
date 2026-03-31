@@ -1,6 +1,6 @@
 from http import HTTPStatus
 
-import requests
+from requests import Session
 
 from constants import BASE_MOVIES_URL, MOVIES_ENDPOINT
 from custom_requester.custom_requester import CustomRequester
@@ -11,7 +11,7 @@ class MoviesAPI(CustomRequester):
     Класс для работы с API фильмов.
     """
 
-    def __init__(self, session: requests.Session):
+    def __init__(self, session: Session):
         super().__init__(session=session, base_url=BASE_MOVIES_URL)
 
     def get_movies(self, params: dict = None, expected_status: HTTPStatus = HTTPStatus.OK):
