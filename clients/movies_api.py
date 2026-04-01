@@ -12,6 +12,7 @@ class MoviesAPI(CustomRequester):
     """
 
     def __init__(self, session: Session):
+        self.session = session
         super().__init__(session=session, base_url=BASE_MOVIES_URL)
 
     def get_movies(self, params: dict = None, expected_status: HTTPStatus = HTTPStatus.OK):

@@ -2,7 +2,7 @@ from http import HTTPStatus
 
 from requests import Session
 
-from constants import BASE_AUTH_URL
+from constants import BASE_AUTH_URL, USER_ENDPOINT
 from custom_requester.custom_requester import CustomRequester
 
 
@@ -14,17 +14,29 @@ class UserAPI(CustomRequester):
     def __init__(self, session: Session):
         super().__init__(session=session, base_url=BASE_AUTH_URL)
 
-    def get_user_info(self, user_id: int, expected_status: HTTPStatus = HTTPStatus.OK):
+    def get_user(self, user_locator, expected_status: HTTPStatus = HTTPStatus.OK):
         """
-        Получение информации о пользователе.
-        :param user_id: ID пользователя.
+        Получение информации о пользователе по ID или Email.
+        :param user_locator: ID или Email пользователя.
         :param expected_status: Ожидаемый статус-код.
         """
         return self.send_request(
-            method="GET",
-            endpoint=f"/user/{user_id}",
-            expected_status=expected_status,
+            method="GET", 
+            endpoint=f"{USER_ENDPOINT}/{user_locator}",
+            expected_status=expected_status
         )
+    
+    # def get_user_info(self, user_id: int, expected_status: HTTPStatus = HTTPStatus.OK):
+    #     """
+    #     Получение информации о пользователе.
+    #     :param user_id: ID пользователя.
+    #     :param expected_status: Ожидаемый статус-код.
+    #     """
+    #     return self.send_request(
+    #         method="GET",
+    #         endpoint=f"/user/{user_id}",
+    #         expected_status=expected_status,
+    #     )
 
     def delete_user(self, user_id: int, expected_status: HTTPStatus = HTTPStatus.OK):
         """
@@ -34,6 +46,19 @@ class UserAPI(CustomRequester):
         """
         return self.send_request(
             method="DELETE",
-            endpoint=f"/user/{user_id}",
+            endpoint=f"{USER_ENDPOINT}/{user_id}",
             expected_status=expected_status,
+        )
+
+    def create_user(self, user_data, expected_status=HTTPStatus.CREATED):
+        """
+        Создание пользователя.
+        :param user_data: Данные пользователя.
+        :param expected_status: Ожидаемый статус-код.
+        """
+        return self.send_request(
+            method="POST",
+            endpoint=USER_ENDPOINT,
+            data=user_data,
+            expected_status=expected_status
         )

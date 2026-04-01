@@ -6,25 +6,10 @@ import requests
 from clients.api_manager import ApiManager
 from utils.data_generator import DataGenerator
 
+from entities.user import User
+from resources.user_creds import SuperAdminCreds
 
-@pytest.fixture(scope="session")
-def session():
-    """
-    Фикстура для создания HTTP-сессии.
-    """
-    http_session = requests.Session()
-
-    yield http_session
-
-    http_session.close()
-
-
-@pytest.fixture(scope="session")
-def api_manager(session):
-    """
-    Фикстура для создания экземпляра ApiManager.
-    """
-    return ApiManager(session)
+from entities.roles import Roles
 
 
 @pytest.fixture()
@@ -39,57 +24,89 @@ def anonymous_api_manager():
         http_session.close()
 
 
-# AuthAPI фикстуры
-@pytest.fixture()
+@pytest.fixture
+def user_session():
+    """
+    Фикстура для создания сессии юзера
+    """
+    user_pool = []
+
+    def _create_user_session():
+        session = requests.Session()
+        user_session = ApiManager(session)
+        user_pool.append(user_session)
+        return user_session
+
+    yield _create_user_session
+
+    for user in user_pool:
+        user.close_session()
+
+
+@pytest.fixture
+def super_admin(user_session):
+    """
+    Фикстура для создания супер-админа
+    """
+    new_session = user_session()
+
+    super_admin = User(
+        SuperAdminCreds.USERNAME,
+        SuperAdminCreds.PASSWORD,
+        [Roles.SUPER_ADMIN.value],
+        new_session)
+
+    super_admin.api.auth_api.authenticate(super_admin.creds)
+    return super_admin
+
+
+@pytest.fixture
+def common_user(user_session, super_admin, creation_user_data):
+    """
+    Фикстура для создания обычного пользователя (объект класса User)
+    """
+    new_session = user_session()
+
+    common_user = User(
+        creation_user_data['email'],
+        creation_user_data['password'],
+        [Roles.USER.value],
+        new_session)
+
+    super_admin.api.user_api.create_user(creation_user_data)
+    common_user.api.auth_api.authenticate(common_user.creds)
+    return common_user
+
+
+@pytest.fixture
 def new_user():
-    random_email = DataGenerator.generate_random_email()
-    random_name = DataGenerator.generate_random_name()
+    """
+    Фикстура для генерации данных для нового пользователя «сырье»
+    """
     random_password = DataGenerator.generate_random_password()
 
     return {
-        "email": random_email,
-        "fullName": random_name,
+        "email": DataGenerator.generate_random_email(),
+        "fullName": DataGenerator.generate_random_name(),
         "password": random_password,
         "passwordRepeat": random_password,
-        "roles": ["USER"]
+        "roles": [Roles.USER.value]
     }
 
 
-@pytest.fixture(scope="session")
-def registered_user(api_manager: ApiManager):
+@pytest.fixture(scope="function")
+def creation_user_data(new_user):
     """
-    Фикстура для регистрации и получения данных зарегистрированного пользователя.
+    Фикстура для генерации данных для нового пользователя (объект класса User)
     """
-    random_email = DataGenerator.generate_random_email()
-    random_name = DataGenerator.generate_random_name()
-    random_password = DataGenerator.generate_random_password()
-    user_data = {
-        "email": random_email,
-        "fullName": random_name,
-        "password": random_password,
-        "passwordRepeat": random_password,
-        "roles": ["USER"]
-    }
+    updated_data = new_user.copy()
+    updated_data.update({
+        "verified": True,
+        "banned": False
+    })
+    return updated_data
 
-    response = api_manager.auth_api.register_user(user_data, expected_status=HTTPStatus.CREATED)
-    response_data = response.json()
-    user = user_data.copy()
-    user["id"] = response_data["id"]
-    return user
-
-
-@pytest.fixture(scope="session")
-def authorized_registered_user(api_manager: ApiManager, registered_user: dict):
-    api_manager.auth_api.authenticate((registered_user["email"], registered_user["password"]))
-
-    return api_manager
-
-
-@pytest.fixture(scope="session")
-def authorized_super_admin(api_manager: ApiManager):
-    api_manager.auth_api.authenticate()
-
-    return api_manager
+#___________________________________________________________
 
 
 def _delete_ok_or_gone(response: requests.Response, context: str):
@@ -102,18 +119,14 @@ def _delete_ok_or_gone(response: requests.Response, context: str):
 
 
 @pytest.fixture()
-def created_user_and_cleanup(api_manager: ApiManager, authorized_super_admin: ApiManager, new_user: dict):
-    response = api_manager.auth_api.register_user(new_user, expected_status=HTTPStatus.CREATED)
-    response_data = response.json()
-
+def created_user_and_cleanup(super_admin: User, new_user: dict):
+    response = super_admin.api.auth_api.register_user(new_user, expected_status=HTTPStatus.CREATED)
     created_user = new_user.copy()
-    created_user["id"] = response_data["id"]
+    created_user["id"] = response.json()["id"]
 
     yield created_user
 
-    authorized_super_admin.auth_api.authenticate()
-
-    response = authorized_super_admin.user_api.delete_user(
+    response = super_admin.api.user_api.delete_user(
         created_user["id"],
         expected_status=None,
     )
@@ -121,15 +134,13 @@ def created_user_and_cleanup(api_manager: ApiManager, authorized_super_admin: Ap
 
 
 @pytest.fixture()
-def users_to_cleanup(authorized_super_admin: ApiManager):
+def users_to_cleanup(super_admin: User):
     created_user_ids = []
 
     yield created_user_ids
 
-    authorized_super_admin.auth_api.authenticate()
-
     for user_id in created_user_ids:
-        response = authorized_super_admin.user_api.delete_user(user_id, expected_status=None)
+        response = super_admin.api.user_api.delete_user(user_id, expected_status=None)
         _delete_ok_or_gone(response, f"delete user {user_id} in users_to_cleanup")
 
 
@@ -151,13 +162,13 @@ def movie_data():
 
 
 @pytest.fixture()
-def created_movie_and_cleanup(authorized_super_admin: ApiManager, movie_data: dict):
+def created_movie_and_cleanup(super_admin: User, movie_data: dict):
     """
     Фикстура для создания фильма и удаления его после теста.
     """
-    authorized_super_admin.auth_api.authenticate()
+    super_admin.api.auth_api.authenticate()
 
-    response = authorized_super_admin.movies_api.post_movie(movie_data, expected_status=HTTPStatus.CREATED)
+    response = super_admin.api.movies_api.post_movie(movie_data, expected_status=HTTPStatus.CREATED)
     response_data = response.json()
 
     created_movie = movie_data.copy()
@@ -165,9 +176,9 @@ def created_movie_and_cleanup(authorized_super_admin: ApiManager, movie_data: di
 
     yield created_movie
 
-    authorized_super_admin.auth_api.authenticate()
+    super_admin.api.auth_api.authenticate()
 
-    response = authorized_super_admin.movies_api.delete_movie(
+    response = super_admin.api.movies_api.delete_movie(
         created_movie["id"],
         expected_status=None,
     )
@@ -175,7 +186,7 @@ def created_movie_and_cleanup(authorized_super_admin: ApiManager, movie_data: di
 
 
 @pytest.fixture(scope="session")
-def movies_to_cleanup(authorized_super_admin: ApiManager):
+def movies_to_cleanup(super_admin: User):
     """
     Список id фильмов на удаление в конце сессии для подчистки фильмов с меткой в name.
     """
@@ -183,8 +194,8 @@ def movies_to_cleanup(authorized_super_admin: ApiManager):
 
     yield created_movie_ids
 
-    authorized_super_admin.auth_api.authenticate()
+    super_admin.api.auth_api.authenticate()
 
     for movie_id in dict.fromkeys(created_movie_ids):
-        response = authorized_super_admin.movies_api.delete_movie(movie_id, expected_status=None)
+        response = super_admin.api.movies_api.delete_movie(movie_id, expected_status=None)
         _delete_ok_or_gone(response, f"delete movie {movie_id} in movies_to_cleanup")
