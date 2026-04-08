@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-
+from resources.user_creds import RegularUserCreds, SuperAdminCreds
 from http import HTTPStatus
 
 from requests import Session
 
 from constants import (
-    ADMIN_EMAIL,
-    ADMIN_PASSWORD,
     BASE_AUTH_URL,
     LOGIN_ENDPOINT,
     REGISTER_ENDPOINT,
@@ -49,12 +47,21 @@ class AuthAPI(CustomRequester):
             expected_status=expected_status,
         )
 
-    def authenticate(self, user_creds: tuple[str, str] = (ADMIN_EMAIL, ADMIN_PASSWORD)):
+    def authenticate(
+        self,
+        user_creds: tuple[str, str] = (SuperAdminCreds.USERNAME, SuperAdminCreds.PASSWORD),
+        use_regular_user: bool = False,
+    ) -> None:
         """
         Логин и установка Bearer-токена в сессию.
-        :param user_creds: Если параметры не переданы — логинится под супер-админом.
+
+        :param user_creds: По умолчанию — супер-админ из env
+        :param use_regular_user: если True — логин под RegularUserCreds из env
         """
-        email, password = user_creds
+        if use_regular_user:
+            email, password = RegularUserCreds.USERNAME, RegularUserCreds.PASSWORD
+        else:
+            email, password = user_creds
         login_data = {"email": email, "password": password}
         response = self.login_user(login_data).json()
 

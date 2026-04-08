@@ -6,6 +6,8 @@ from typing import Optional
 
 import requests
 
+from constants import RED, GREEN, RESET
+from pydantic import BaseModel
 
 class CustomRequester:
     """
@@ -47,6 +49,8 @@ class CustomRequester:
         :return: Объект ответа requests.Response.
         """
         url = f"{self.base_url}{endpoint}"
+        if isinstance(data, BaseModel):
+            data = json.loads(data.model_dump_json(exclude_unset=True))
         response = self.session.request(method, url, json=data, headers=self.headers, params=params)
         if need_logging:
             self.log_request_and_response(response)
@@ -62,16 +66,20 @@ class CustomRequester:
         self.headers.update(kwargs)
         self.session.headers.update(self.headers)
 
+
     def log_request_and_response(self, response: requests.Response):
         """
         Логирование запросов и ответов.
         :param response: Объект ответа requests.Response.
         """
+        """
+        Логгирование запросов и ответов. Настройки логгирования описаны в pytest.ini
+        Преобразует вывод в curl-like (-H хэдэеры), (-d тело)
+
+        :param response: Объект response получаемый из метода "send_request"
+        """
         try:
             request = response.request
-            GREEN = '\033[32m'
-            RED = '\033[31m'
-            RESET = '\033[0m'
             headers = " \\\n".join([f"-H '{header}: {value}'" for header, value in request.headers.items()])
             full_test_name = f"pytest {os.environ.get('PYTEST_CURRENT_TEST', '').replace(' (call)', '')}"
 
@@ -79,6 +87,8 @@ class CustomRequester:
             if hasattr(request, 'body') and request.body is not None:
                 if isinstance(request.body, bytes):
                     body = request.body.decode('utf-8')
+                elif isinstance(request.body, str):
+                    body = request.body
                 body = f"-d '{body}' \n" if body != '{}' else ''
 
             # Логируем запрос

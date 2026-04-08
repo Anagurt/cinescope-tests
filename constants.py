@@ -1,12 +1,5 @@
-import os
+from resources.user_creds import SuperAdminCreds
 
-from dotenv import load_dotenv
-
-load_dotenv()
-
-
-ADMIN_EMAIL = os.getenv("ADMIN_EMAIL")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 
 HEADERS = {
     "Content-Type": "application/json",
@@ -20,3 +13,7 @@ LOGIN_ENDPOINT = "/login"
 REGISTER_ENDPOINT = "/register"
 MOVIES_ENDPOINT = "/movies"
 USER_ENDPOINT = "/user"
+
+GREEN = '\033[32m'
+RED = '\033[31m'
+RESET = '\033[0m'
