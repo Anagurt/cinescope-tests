@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from resources.user_creds import RegularUserCreds, SuperAdminCreds
 from http import HTTPStatus
 
 from requests import Session
@@ -11,6 +10,7 @@ from constants import (
     REGISTER_ENDPOINT,
 )
 from custom_requester.custom_requester import CustomRequester
+from resources.user_creds import RegularUserCreds, SuperAdminCreds
 
 
 class AuthAPI(CustomRequester):
@@ -21,7 +21,9 @@ class AuthAPI(CustomRequester):
     def __init__(self, session: Session):
         super().__init__(session=session, base_url=BASE_AUTH_URL)
 
-    def register_user(self, user_data: dict, expected_status: HTTPStatus = HTTPStatus.CREATED):
+    def register_user(self,
+                      user_data: dict,
+                      expected_status: HTTPStatus = HTTPStatus.CREATED):
         """
         Регистрация нового пользователя.
         :param user_data: Данные пользователя.
@@ -34,7 +36,9 @@ class AuthAPI(CustomRequester):
             expected_status=expected_status,
         )
 
-    def login_user(self, login_data: dict, expected_status: HTTPStatus = HTTPStatus.OK):
+    def login_user(self,
+                   login_data: dict,
+                   expected_status: HTTPStatus = HTTPStatus.OK):
         """
         Авторизация пользователя.
         :param login_data: Данные для логина.
@@ -49,7 +53,8 @@ class AuthAPI(CustomRequester):
 
     def authenticate(
         self,
-        user_creds: tuple[str, str] = (SuperAdminCreds.USERNAME, SuperAdminCreds.PASSWORD),
+        user_creds: tuple[str, str] = (SuperAdminCreds.USERNAME,
+                                       SuperAdminCreds.PASSWORD),
         use_regular_user: bool = False,
     ) -> None:
         """

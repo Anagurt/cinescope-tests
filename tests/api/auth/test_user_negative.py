@@ -1,11 +1,76 @@
-# from http import HTTPStatus
+from http import HTTPStatus
 
-# import allure
+import allure
+import pytest
 
-# from clients.api_manager import ApiManager
+from models.base_model_user import UserForbiddenResponse, UserNotFoundResponse
 
-# @allure.feature("Негативные тесты для эндпоинта Пользователь Auth API")
-# class TestUserAPINegative:
-#     @allure.story("Тест на получение информации о пользователе по ID для обычного пользователя")
-#     def test_get_user_by_id_common_user(self, common_user):
-#         common_user.api.user_api.get_user(common_user.email, expected_status=HTTPStatus.FORBIDDEN)
+
+@allure.feature("Негативные тесты для эндпоинта User API")
+class TestUserAPINegative:
+
+    @pytest.mark.smoke
+    @pytest.mark.negative
+    @allure.story(
+        "Тест на получение информации о пользователе по ID под обычным пользователем"
+    )
+    def test_get_user_by_id_common_user(
+            self,
+            common_user,
+            expected_status: HTTPStatus = HTTPStatus.FORBIDDEN):
+        response = common_user.api.user_api.get_user_info(
+            user_id=common_user.id, expected_status=expected_status)
+        forbidden_response = UserForbiddenResponse.model_validate(
+            response.json())
+        assert forbidden_response.message == "Forbidden resource"
+
+    @pytest.mark.smoke
+    @pytest.mark.negative
+    @pytest.mark.xfail(reason="API возвращает 200 вместо 404")
+    @allure.story(
+        "Тест на получение информации о пользователе по ID или Email под супер-админом"
+    )
+    @pytest.mark.parametrize(
+        "user_locator, expected_status",
+        [("non_existent_id", HTTPStatus.NOT_FOUND),
+         ("non_existent_email", HTTPStatus.NOT_FOUND)],
+        ids=[
+            "Получение информации о несуществующем пользователе по ID",
+            "Получение информации о несуществующем пользователе по Email"
+        ])
+    def test_get_user_by_locator(self, super_admin, user_locator,
+                                 expected_status):
+        response = super_admin.api.user_api.get_user_info(
+            user_id=user_locator, expected_status=expected_status)
+        not_found_response = UserNotFoundResponse.model_validate(
+            response.json())
+        assert not_found_response.message == "Not Found"
+
+    @pytest.mark.smoke
+    @pytest.mark.negative
+    @allure.story("Тест на удаление пользователя под обычным пользователем")
+    def test_delete_user_common_user(
+            self,
+            regular_user,
+            common_user,
+            expected_status: HTTPStatus = HTTPStatus.FORBIDDEN):
+        response = regular_user.api.user_api.delete_user(
+            common_user.id, expected_status=expected_status)
+        forbidden_response = UserForbiddenResponse.model_validate(
+            response.json())
+        assert forbidden_response.message == "Forbidden"
+
+    @pytest.mark.smoke
+    @pytest.mark.negative
+    @allure.story(
+        "Тест на удаление несуществующего пользователя под супер-админом")
+    def test_delete_non_existent_user(
+            self,
+            super_admin,
+            expected_status: HTTPStatus = HTTPStatus.NOT_FOUND):
+        response = super_admin.api.user_api.delete_user(
+            "00000000-0000-0000-0000-000000000000",
+            expected_status=expected_status)
+        not_found_response = UserNotFoundResponse.model_validate(
+            response.json())
+        assert not_found_response.message == "Not Found"

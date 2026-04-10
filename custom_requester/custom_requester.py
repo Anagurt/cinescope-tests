@@ -5,9 +5,10 @@ from http import HTTPStatus
 from typing import Optional
 
 import requests
-
-from constants import RED, GREEN, RESET
 from pydantic import BaseModel
+
+from constants import GREEN, RED, RESET
+
 
 class CustomRequester:
     """
@@ -51,11 +52,17 @@ class CustomRequester:
         url = f"{self.base_url}{endpoint}"
         if isinstance(data, BaseModel):
             data = json.loads(data.model_dump_json(exclude_unset=True))
-        response = self.session.request(method, url, json=data, headers=self.headers, params=params)
+        response = self.session.request(method,
+                                        url,
+                                        json=data,
+                                        headers=self.headers,
+                                        params=params)
         if need_logging:
             self.log_request_and_response(response)
         if expected_status is not None and response.status_code != expected_status:
-            raise ValueError(f"Unexpected status code: {response.status_code}. Expected: {expected_status}")
+            raise ValueError(
+                f"Unexpected status code: {response.status_code}. Expected: {expected_status}"
+            )
         return response
 
     def _update_session_headers(self, **kwargs: str):
@@ -65,7 +72,6 @@ class CustomRequester:
         """
         self.headers.update(kwargs)
         self.session.headers.update(self.headers)
-
 
     def log_request_and_response(self, response: requests.Response):
         """
@@ -80,7 +86,10 @@ class CustomRequester:
         """
         try:
             request = response.request
-            headers = " \\\n".join([f"-H '{header}: {value}'" for header, value in request.headers.items()])
+            headers = " \\\n".join([
+                f"-H '{header}: {value}'"
+                for header, value in request.headers.items()
+            ])
             full_test_name = f"pytest {os.environ.get('PYTEST_CURRENT_TEST', '').replace(' (call)', '')}"
 
             body = ""
@@ -93,12 +102,10 @@ class CustomRequester:
 
             # Логируем запрос
             self.logger.info(f"\n{'=' * 40} REQUEST {'=' * 40}")
-            self.logger.info(
-                f"{GREEN}{full_test_name}{RESET}\n"
-                f"curl -X {request.method} '{request.url}' \\\n"
-                f"{headers} \\\n"
-                f"{body}"
-            )
+            self.logger.info(f"{GREEN}{full_test_name}{RESET}\n"
+                             f"curl -X {request.method} '{request.url}' \\\n"
+                             f"{headers} \\\n"
+                             f"{body}")
 
             # Обрабатываем ответ
             response_status = response.status_code
@@ -107,7 +114,9 @@ class CustomRequester:
 
             # Попытка форматировать JSON
             try:
-                response_data = json.dumps(json.loads(response.text), indent=4, ensure_ascii=False)
+                response_data = json.dumps(json.loads(response.text),
+                                           indent=4,
+                                           ensure_ascii=False)
             except json.JSONDecodeError:
                 pass  # Оставляем текст, если это не JSON
 
@@ -116,13 +125,11 @@ class CustomRequester:
             if not is_success:
                 self.logger.info(
                     f"\tSTATUS_CODE: {RED}{response_status}{RESET}\n"
-                    f"\tDATA: {RED}{response_data}{RESET}"
-                )
+                    f"\tDATA: {RED}{response_data}{RESET}")
             else:
                 self.logger.info(
                     f"\tSTATUS_CODE: {GREEN}{response_status}{RESET}\n"
-                    f"\tDATA:\n{response_data}"
-                )
+                    f"\tDATA:\n{response_data}")
             self.logger.info(f"{'=' * 80}\n")
         except Exception as e:
             self.logger.error(f"\nLogging failed: {type(e)} - {e}")

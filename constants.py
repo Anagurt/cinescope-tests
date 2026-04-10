@@ -1,10 +1,4 @@
-from resources.user_creds import SuperAdminCreds
-
-
-HEADERS = {
-    "Content-Type": "application/json",
-    "Accept": "application/json"
-}
+HEADERS = {"Content-Type": "application/json", "Accept": "application/json"}
 
 BASE_AUTH_URL = "https://auth.dev-cinescope.coconutqa.ru"
 BASE_MOVIES_URL = "https://api.dev-cinescope.coconutqa.ru"

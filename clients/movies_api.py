@@ -15,7 +15,9 @@ class MoviesAPI(CustomRequester):
         self.session = session
         super().__init__(session=session, base_url=BASE_MOVIES_URL)
 
-    def get_movies(self, params: dict = None, expected_status: HTTPStatus = HTTPStatus.OK):
+    def get_movies(self,
+                   params: dict = None,
+                   expected_status: HTTPStatus = HTTPStatus.OK):
         """
         Получение списка афиш фильмов.
         :param params: Параметры запроса.
@@ -28,7 +30,9 @@ class MoviesAPI(CustomRequester):
             expected_status=expected_status,
         )
 
-    def post_movie(self, movie_data: dict, expected_status: HTTPStatus = HTTPStatus.CREATED):
+    def post_movie(self,
+                   movie_data: dict,
+                   expected_status: HTTPStatus = HTTPStatus.CREATED):
         """
         Создание афиши фильма.
         :param movie_data: Данные афиши фильма.
@@ -41,7 +45,9 @@ class MoviesAPI(CustomRequester):
             expected_status=expected_status,
         )
 
-    def get_movie(self, movie_id: int, expected_status: HTTPStatus = HTTPStatus.OK):
+    def get_movie(self,
+                  movie_id: int,
+                  expected_status: HTTPStatus = HTTPStatus.OK):
         """
         Получение информации о фильме.
         :param movie_id: ID афиши фильма.
@@ -53,7 +59,10 @@ class MoviesAPI(CustomRequester):
             expected_status=expected_status,
         )
 
-    def patch_movie(self, movie_id: int, change_movie_data: dict, expected_status: HTTPStatus = HTTPStatus.OK):
+    def patch_movie(self,
+                    movie_id: int,
+                    change_movie_data: dict,
+                    expected_status: HTTPStatus = HTTPStatus.OK):
         """
         Редактирование афиши фильма.
         :param movie_id: ID афиши фильма.
@@ -67,7 +76,9 @@ class MoviesAPI(CustomRequester):
             expected_status=expected_status,
         )
 
-    def delete_movie(self, movie_id: int, expected_status: HTTPStatus = HTTPStatus.OK):
+    def delete_movie(self,
+                     movie_id: int,
+                     expected_status: HTTPStatus = HTTPStatus.OK):
         """
         Удаление афиши фильма.
         :param movie_id: ID афиши фильма.

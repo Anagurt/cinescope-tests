@@ -1,21 +1,22 @@
-from pydantic import BaseModel, Field, field_validator, EmailStr
-from typing import Optional
-import datetime
-import re
-from typing import List
-from entities.roles import Roles
+from http import HTTPStatus
+from typing import List, Optional
 
-def _assert_iso_datetime_string(value: str) -> str:
-    """Проверяем, что строка является корректной датой и временем в формате ISO 8601."""
-    normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
-    datetime.datetime.fromisoformat(normalized)
-    return value
+from pydantic import BaseModel, EmailStr, Field, field_validator
+
+from entities.roles import Roles
+from utils.iso_datetime import validate_iso8601_datetime_string
+
 
 class RegisterUserRequest(BaseModel):
     email: EmailStr
     fullName: str
     password: str
-    passwordRepeat: str = Field(..., min_length=1, max_length=20, description="passwordRepeat должен вполностью совпадать с полем password")
+    passwordRepeat: str = Field(
+        ...,
+        min_length=1,
+        max_length=20,
+        description=
+        "passwordRepeat должен вполностью совпадать с полем password")
     roles: list[Roles] = [Roles.USER]
     verified: Optional[bool] = None
     banned: Optional[bool] = None
@@ -37,21 +38,36 @@ class RegisterUserRequest(BaseModel):
 class RegisterUserResponse(BaseModel):
     id: str
     email: EmailStr
-    fullName: str = Field(min_length=1, max_length=100, description="Полное имя пользователя")
+    fullName: str = Field(min_length=1,
+                          max_length=100,
+                          description="Полное имя пользователя")
     verified: bool
     banned: bool
     roles: List[Roles]
-    createdAt: str = Field(description="Дата и время создания пользователя в формате ISO 8601")
+    createdAt: str = Field(
+        description="Дата и время создания пользователя в формате ISO 8601")
 
     @field_validator("createdAt")
     def validate_created_at(cls, value: str) -> str:
         # Валидатор для проверки формата даты и времени (ISO 8601).
         try:
-            return _assert_iso_datetime_string(value)
+            return validate_iso8601_datetime_string(value)
         except ValueError:
-            raise ValueError("Некорректный формат даты и времени. Ожидается формат ISO 8601.")
+            raise ValueError(
+                "Некорректный формат даты и времени. Ожидается формат ISO 8601."
+            )
 
-    
+
+class RegisterUserBadRequestResponse(BaseModel):
+    message: list[str]
+    error: str = "Bad Request"
+    statusCode: int = HTTPStatus.BAD_REQUEST
+
+
+class RegisterUserConflictResponse(BaseModel):
+    message: str = "Пользователь с таким email уже зарегистрирован"
+    error: str = "Conflict"
+    statusCode: int = HTTPStatus.CONFLICT
 
 
 class LoginUserRequest(BaseModel):
@@ -75,26 +91,15 @@ class LoginUserPayload(BaseModel):
     fullName: str
     roles: List[Roles]
 
+
 class LoginResponse(BaseModel):
     user: LoginUserPayload
     accessToken: str
     refreshToken: str
     expiresIn: int
 
-# Приходят те же поля и что и при удалении пользователя 
-class UserInfoResponse(BaseModel):
-    id: str
-    email: EmailStr
-    fullName: str
-    roles: List[Roles]
-    verified: bool
-    banned: bool
-    createdAt: str = Field(description="Дата и время создания пользователя в формате ISO 8601")
 
-    @field_validator("createdAt")
-    def validate_created_at(cls, value: str) -> str:
-        # Валидатор для проверки формата даты и времени (ISO 8601).
-        try:
-            return _assert_iso_datetime_string(value)
-        except ValueError:
-            raise ValueError("Некорректный формат даты и времени. Ожидается формат ISO 8601.")
+class LoginUserUnauthorizedResponse(BaseModel):
+    message: str = "Неверный логин или пароль"
+    error: str = "Unauthorized"
+    statusCode: int = HTTPStatus.UNAUTHORIZED

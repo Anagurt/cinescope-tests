@@ -1,7 +1,10 @@
 from clients.api_manager import ApiManager
 
+
 class User:
-    def __init__(self, id: str, email: str, password: str, roles: list, api: ApiManager):
+
+    def __init__(self, id: str, email: str, password: str, roles: list,
+                 api: ApiManager):
         self.id = id
         self.email = email
         self.password = password
