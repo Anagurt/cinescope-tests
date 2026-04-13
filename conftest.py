@@ -11,10 +11,16 @@ from models.base_models_auth import RegisterUserRequest
 from models.base_model_movies import MovieInfoRequest, MovieInfoResponse
 from resources.user_creds import RegularUserCreds, SuperAdminCreds
 from utils.data_generator import DataGenerator
+from typing import List 
+from sqlalchemy.orm import Session
+from db_requester.db_client import get_db_session
+from db_requester.db_helpers import DBHelper
+from db_models.user import UserDBModel
+from db_models.movies import MovieDBModel
 
 
 @pytest.fixture()
-def anonymous_api_manager():
+def anonymous_api_manager() -> ApiManager:
     """
     Фикстура для создания экземпляра ApiManager без заголовков авторизации
     """
@@ -26,13 +32,13 @@ def anonymous_api_manager():
 
 
 @pytest.fixture()
-def api_manager(anonymous_api_manager):
+def api_manager(anonymous_api_manager: ApiManager) -> ApiManager:
     """Алиас для тестов, ожидающих имя фикстуры api_manager."""
     return anonymous_api_manager
 
 
 @pytest.fixture
-def user_session():
+def user_session() -> ApiManager:
     """
     Фикстура для создания сессии юзера
     """
@@ -51,7 +57,7 @@ def user_session():
 
 
 @pytest.fixture
-def super_admin(user_session):
+def super_admin(user_session: ApiManager) -> User:
     """
     Фикстура для создания супер-админа
     """
@@ -66,7 +72,7 @@ def super_admin(user_session):
 
 
 @pytest.fixture
-def regular_user(user_session):
+def regular_user(user_session: ApiManager) -> User:
     """
     Фикстура для создания обычного пользователя
     """
@@ -93,7 +99,7 @@ def test_user() -> RegisterUserRequest:
 
 
 @pytest.fixture(scope="function")
-def creation_user_data(test_user: RegisterUserRequest):
+def creation_user_data(test_user: RegisterUserRequest) -> RegisterUserRequest:
     """
     Фикстура для генерации данных для нового пользователя (объект класса User)
     """
@@ -103,7 +109,7 @@ def creation_user_data(test_user: RegisterUserRequest):
 
 
 @pytest.fixture
-def common_user(user_session, super_admin, creation_user_data):
+def common_user(user_session, super_admin, creation_user_data) -> User:
     """
     Фикстура для создания обычного пользователя (объект класса User)
     """
@@ -124,7 +130,7 @@ def common_user(user_session, super_admin, creation_user_data):
                        f"удаление пользователя {user_id} после теста")
 
 
-def _delete_ok_or_gone(response: requests.Response, context: str):
+def _delete_ok_or_gone(response: requests.Response, context: str) -> None:
     if response.status_code in (HTTPStatus.OK, HTTPStatus.NOT_FOUND):
         return
     raise RuntimeError(
@@ -133,7 +139,7 @@ def _delete_ok_or_gone(response: requests.Response, context: str):
 
 
 @pytest.fixture()
-def users_to_cleanup(super_admin: User):
+def users_to_cleanup(super_admin: User) -> List[str]:
     created_user_ids = []
 
     yield created_user_ids
@@ -165,7 +171,7 @@ def movie_data() -> MovieInfoRequest:
 
 
 @pytest.fixture()
-def created_movie_and_cleanup(super_admin: User, movie_data: MovieInfoRequest):
+def created_movie_and_cleanup(super_admin: User, movie_data: MovieInfoRequest) -> MovieInfoResponse:
     """
     Фикстура для создания фильма и удаления его после теста.
     """
@@ -186,7 +192,7 @@ def created_movie_and_cleanup(super_admin: User, movie_data: MovieInfoRequest):
 
 
 @pytest.fixture(scope="function")
-def movies_to_cleanup(super_admin: User):
+def movies_to_cleanup(super_admin: User) -> List[int]:
     """
     Список id фильмов на удаление в конце сессии для подчистки фильмов с меткой в name.
     """
@@ -201,3 +207,49 @@ def movies_to_cleanup(super_admin: User):
             movie_id, expected_status=None)
         _delete_ok_or_gone(response,
                            f"delete movie {movie_id} in movies_to_cleanup")
+
+
+# Фикстуры для работы с БД (SQLAlchemy)
+
+@pytest.fixture(scope="module")
+def db_session() -> Session:
+    """
+    Фикстура, которая создает и возвращает сессию для работы с базой данных
+    После завершения тестов сессия автоматически закрывается
+    """
+    db_session = get_db_session()
+    yield db_session
+    db_session.close()
+
+@pytest.fixture(scope="function")
+def db_helper(db_session: Session) -> DBHelper:
+    """
+    Фикстура для экземпляра хелпера
+    """
+    db_helper = DBHelper(db_session)
+    return db_helper
+
+
+@pytest.fixture(scope="function")
+def created_test_user(db_helper: DBHelper) -> UserDBModel:
+    """
+    Фикстура, которая создает тестового пользователя в БД
+    и удаляет его после завершения теста
+    """
+    user = db_helper.create_test_user(DataGenerator.generate_user_data())
+    yield user
+    # Cleanup после теста
+    if db_helper.get_user_by_id(user.id):
+        db_helper.delete_user(user)
+
+@pytest.fixture(scope="function")
+def created_test_movie(db_helper: DBHelper) -> MovieDBModel:
+    """
+    Фикстура, которая создает тестовый фильм в БД
+    и удаляет его после завершения теста
+    """
+    movie = db_helper.create_movie(DataGenerator.generate_movie_data())
+    yield movie
+    # Cleanup после теста
+    if db_helper.get_movie_by_id(movie.id):
+        db_helper.delete_movie(movie)

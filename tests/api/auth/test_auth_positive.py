@@ -6,25 +6,28 @@ import pytest
 from clients.api_manager import ApiManager
 from models.base_models_auth import (
     LoginResponse,
+    RegisterUserRequest,
     LoginUserRequest,
     RegisterUserResponse,
 )
 from resources.user_creds import RegularUserCreds, SuperAdminCreds
-
+from db_requester.db_helpers import DBHelper
 
 @allure.feature("Позитивные тесты для auth API")
 class TestAuthAPIPositive:
 
     @pytest.mark.smoke
     @allure.story("Тест на регистрацию пользователя")
-    def test_register_user(self, api_manager: ApiManager, test_user,
-                           users_to_cleanup: list):
+    def test_register_user(self, api_manager: ApiManager, test_user: RegisterUserRequest,
+                           users_to_cleanup: list, db_helper: DBHelper):
+        assert not db_helper.user_exists_by_email(test_user.email)
         response = api_manager.auth_api.register_user(
             user_data=test_user.model_dump(mode="json"))
         register_user_response = RegisterUserResponse.model_validate(
             response.json())
         assert register_user_response.email == test_user.email, "Email не совпадает"
         users_to_cleanup.append(register_user_response.id)
+        assert db_helper.user_exists_by_email(test_user.email)
 
     @pytest.mark.smoke
     @allure.story("Тест на авторизацию пользователя")

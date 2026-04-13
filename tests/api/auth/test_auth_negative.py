@@ -4,12 +4,14 @@ import allure
 import pytest
 
 from models.base_models_auth import (
+    RegisterUserRequest,
     LoginUserUnauthorizedResponse,
     RegisterUserBadRequestResponse,
     RegisterUserConflictResponse,
 )
 from resources.user_creds import RegularUserCreds, SuperAdminCreds
-
+from db_requester.db_helpers import DBHelper
+from clients.api_manager import ApiManager
 
 @allure.feature("Негативные тесты для auth API")
 class TestAuthAPINegative:
@@ -33,9 +35,9 @@ class TestAuthAPINegative:
             "Пустой email", "Пустой password", "Пустой fullName",
             "Пустой passwordRepeat"
         ])
-    def test_register_user_with_empty_fields(self, email, fullName, password,
-                                             passwordRepeat, expected_status,
-                                             api_manager, request):
+    def test_register_user_with_empty_fields(self, email: str, fullName: str, password: str,
+                                             passwordRepeat: str, expected_status: HTTPStatus,
+                                             api_manager, request, db_helper: DBHelper):
         register_data = {
             "email": email,
             "fullName": fullName,
@@ -48,10 +50,11 @@ class TestAuthAPINegative:
             response.json())
         message_response = request.node.callspec.id
         text = f"{message_response}\n\n" + "\n".join(
-            f'"{m}"' for m in register_user_response.message)
+            f'"{message}"' for message in register_user_response.message)
         allure.attach(text,
                       name="Сообщения об ошибках API",
                       attachment_type=allure.attachment_type.TEXT)
+        assert not db_helper.user_exists_by_email(email)
 
     @pytest.mark.smoke
     @pytest.mark.negative
@@ -69,20 +72,23 @@ class TestAuthAPINegative:
             "Регистрация уже существующего супер-админа",
             "Регистрация уже существующего пользователя"
         ])
-    def test_register_already_exist_user(self, email, fullName, password,
-                                         passwordRepeat, expected_status,
-                                         api_manager):
+    def test_register_already_exist_user(self, email: str, fullName: str, password: str,
+                                         passwordRepeat: str, expected_status: HTTPStatus,
+                                         api_manager: ApiManager, db_helper: DBHelper):
         register_data = {
             "email": email,
             "fullName": fullName,
             "password": password,
             "passwordRepeat": passwordRepeat
         }
+        assert db_helper.user_exists_by_email(email)
         response = api_manager.auth_api.register_user(
             user_data=register_data, expected_status=expected_status)
         register_user_response = RegisterUserConflictResponse.model_validate(
             response.json())
         assert register_user_response.message == "Пользователь с таким email уже зарегистрирован"
+        assert db_helper.user_count_by_email(email) == 1
+
 
     @pytest.mark.smoke
     @pytest.mark.negative
@@ -106,9 +112,9 @@ class TestAuthAPINegative:
             "email без локальной части", "слишком короткий password",
             "слишком длинный password"
         ])
-    def test_register_user_with_invalid_fields(self, email, fullName, password,
-                                               passwordRepeat, expected_status,
-                                               api_manager, request):
+    def test_register_user_with_invalid_fields(self, email: str, fullName: str, password: str,
+                                               passwordRepeat: str, expected_status: HTTPStatus,
+                                               api_manager, request, db_helper: DBHelper):
         register_data = {
             "email": email,
             "fullName": fullName,
@@ -125,6 +131,7 @@ class TestAuthAPINegative:
         allure.attach(text,
                       name="Сообщения об ошибках API",
                       attachment_type=allure.attachment_type.TEXT)
+        assert not db_helper.user_exists_by_email(email)
 
     @pytest.mark.smoke
     @pytest.mark.negative
@@ -132,15 +139,18 @@ class TestAuthAPINegative:
         "Негативный тест на авторизацию еще не существующего пользователя")
     def test_login_unregistered_user(
             self,
-            test_user,
-            api_manager,
+            test_user: RegisterUserRequest,
+            api_manager: ApiManager,
+            db_helper: DBHelper,
             expected_status: HTTPStatus = HTTPStatus.UNAUTHORIZED):
+        assert not db_helper.user_exists_by_email(test_user.email)
         login_data = {"email": test_user.email, "password": test_user.password}
         response = api_manager.auth_api.login_user(
             login_data=login_data, expected_status=expected_status)
         login_user_response = LoginUserUnauthorizedResponse.model_validate(
             response.json())
         assert login_user_response.message == "Неверный логин или пароль"
+        assert not db_helper.user_exists_by_email(test_user.email)
 
     @pytest.mark.smoke
     @pytest.mark.negative

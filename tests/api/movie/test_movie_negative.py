@@ -8,6 +8,7 @@ from clients.api_manager import ApiManager
 from resources.user_creds import RegularUserCreds, AdminCreds
 from utils.data_generator import DataGenerator
 from entities.location import Location
+from db_requester.db_helpers import DBHelper
 
 @allure.feature("Негативные тесты для movies API")
 class TestMoviesAPINegative:
@@ -36,8 +37,9 @@ class TestMoviesAPINegative:
         [("get", HTTPStatus.NOT_FOUND), ("delete", HTTPStatus.NOT_FOUND), ("patch", HTTPStatus.NOT_FOUND)],
         ids=["GET несуществующего фильма", "DELETE несуществующего фильма", "PATCH несуществующего фильма"],
     )
-    def test_operation_with_nonexistent_movie_super_admin(self, super_admin, operation, expected_status):
+    def test_operation_with_nonexistent_movie_super_admin(self, super_admin, operation, expected_status, db_helper: DBHelper):
         movie_id = 999999999
+        assert not db_helper.get_movie_by_id(movie_id)
 
         if operation == "get":
             response = super_admin.api.movies_api.get_movie(movie_id, expected_status=expected_status)
@@ -76,10 +78,11 @@ class TestMoviesAPINegative:
         (f"{AdminCreds.USERNAME}", f"{AdminCreds.PASSWORD}", HTTPStatus.FORBIDDEN),
         (f"{RegularUserCreds.USERNAME}", f"{RegularUserCreds.PASSWORD}", HTTPStatus.FORBIDDEN)
         ], ids=["Создание фильма под админом", "Создание фильма под пользователем"])
-    def test_create_movie_by_invalid_role_user(self, api_manager: ApiManager, email, password, movie_data, expected_status):
+    def test_create_movie_by_invalid_role_user(self, api_manager: ApiManager, email, password, movie_data, expected_status, db_helper: DBHelper):
         api_manager.auth_api.authenticate((email, password))
         response = api_manager.movies_api.post_movie(movie_data, expected_status=expected_status)
         GetMovieForbiddenResponse.model_validate(response.json())
+        assert not db_helper.movie_exists_by_name(movie_data.name)
 
     @pytest.mark.smoke
     @pytest.mark.negative
@@ -89,10 +92,12 @@ class TestMoviesAPINegative:
         (f"{AdminCreds.USERNAME}", f"{AdminCreds.PASSWORD}", HTTPStatus.FORBIDDEN),
         (f"{RegularUserCreds.USERNAME}", f"{RegularUserCreds.PASSWORD}", HTTPStatus.FORBIDDEN)
         ], ids=["Удаление фильма под админом", "Удаление фильма под пользователем"])
-    def test_delete_movie_by_invalid_role_user(self, api_manager: ApiManager, email, password, created_movie_and_cleanup, expected_status):
+    def test_delete_movie_by_invalid_role_user(self, api_manager: ApiManager, email, password, created_movie_and_cleanup, expected_status, db_helper: DBHelper):
+        assert db_helper.get_movie_by_id(created_movie_and_cleanup.id)
         api_manager.auth_api.authenticate((email, password))
         response = api_manager.movies_api.delete_movie(created_movie_and_cleanup.id, expected_status=expected_status)
         GetMovieForbiddenResponse.model_validate(response.json())
+        assert db_helper.get_movie_by_id(created_movie_and_cleanup.id)
 
 
     @pytest.mark.smoke
@@ -103,7 +108,8 @@ class TestMoviesAPINegative:
         (f"{AdminCreds.USERNAME}", f"{AdminCreds.PASSWORD}", HTTPStatus.FORBIDDEN),
         (f"{RegularUserCreds.USERNAME}", f"{RegularUserCreds.PASSWORD}", HTTPStatus.FORBIDDEN)
         ], ids=["Изменение фильма под админом", "Изменение фильма под пользователем"])
-    def test_patch_movie_by_invalid_role_user(self, api_manager: ApiManager, email, password, created_movie_and_cleanup, expected_status):
+    def test_patch_movie_by_invalid_role_user(self, api_manager: ApiManager, email, password, created_movie_and_cleanup, expected_status, db_helper: DBHelper):
+        assert db_helper.get_movie_by_id(created_movie_and_cleanup.id)
         api_manager.auth_api.authenticate((email, password))
         change_movie_data = MovieInfoRequest(
             name=DataGenerator.generate_random_name_movie(),
@@ -116,12 +122,14 @@ class TestMoviesAPINegative:
         )
         response = api_manager.movies_api.patch_movie(created_movie_and_cleanup.id, change_movie_data.model_dump(mode="json"), expected_status=expected_status)
         GetMovieForbiddenResponse.model_validate(response.json())
+        assert db_helper.movie_exists_by_name(created_movie_and_cleanup.name)
 
 
     @pytest.mark.smoke
     @pytest.mark.negative
     @allure.story("Негативный тест на создание афиши фильма с теми же данными, что и уже существующего")
-    def test_create_same_movie_duplicated(self, super_admin, created_movie_and_cleanup):
+    def test_create_same_movie_duplicated(self, super_admin, created_movie_and_cleanup, db_helper: DBHelper):
+        assert db_helper.movie_exists_by_name(created_movie_and_cleanup.name)
         movie_data = MovieInfoRequest(
             name=created_movie_and_cleanup.name,
             imageUrl=created_movie_and_cleanup.imageUrl,
@@ -133,6 +141,7 @@ class TestMoviesAPINegative:
         )
         response = super_admin.api.movies_api.post_movie(movie_data, expected_status=HTTPStatus.CONFLICT)
         GetMovieConflictResponse.model_validate(response.json())
+        assert db_helper.movie_count_by_name(created_movie_and_cleanup.name) == 1
 
 
     @allure.story("Негативный тест на изменение афиши фильма с пустыми данными")

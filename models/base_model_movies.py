@@ -14,7 +14,7 @@ class MovieInfoRequest(BaseModel):
     """
     name: str
     imageUrl: str
-    price: float = Field(..., ge=1, description="Цена фильма")
+    price: int = Field(..., ge=1, description="Цена фильма")
     description: str
     location: Location = Field(..., description="Местоположение фильма")
     published: bool
@@ -34,7 +34,7 @@ class MovieInfoResponse(BaseModel):
     description: str
     genreId: int
     imageUrl: Optional[str] = None
-    price: float
+    price: int
     rating: float
     location: Location
     published: bool
