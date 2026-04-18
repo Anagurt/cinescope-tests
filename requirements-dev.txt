@@ -1,0 +1,6 @@
+-r requirements.txt
+
+flake8==7.3.0
+isort==6.0.1
+yapf==0.43.0
+allure-pytest==2.15.2
