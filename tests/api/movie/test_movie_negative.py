@@ -61,7 +61,11 @@ class TestMoviesAPINegative:
             db_helper: DBHelper,
             expected_status: HTTPStatus = HTTPStatus.NOT_FOUND):
         movie_id = 999999999
-        assert not db_helper.get_movie_by_id(movie_id)
+        # assert not db_helper.get_movie_by_id(movie_id)
+        if db_helper.get_movie_by_id(movie_id):
+            raise AssertionError(
+                f"Несуществующий фильм с ID {movie_id} существует в БД"
+            )
 
         if operation == MovieOperations.GET:
             response = super_admin.api.movies_api.get_movie(
@@ -72,7 +76,7 @@ class TestMoviesAPINegative:
         if operation == MovieOperations.PATCH:
             response = super_admin.api.movies_api.patch_movie(
                 movie_id,
-                MovieConstants.PATCH_MOVIE_DATA,
+                MovieConstants.PATCH_MOVIE_DATA_NEGATIVE_CASES,
                 expected_status=expected_status,
             )
         GetMovieNotFoundResponse.model_validate(response.json())
@@ -120,7 +124,12 @@ class TestMoviesAPINegative:
         response = api_manager.movies_api.post_movie(
             movie_data, expected_status=expected_status)
         GetMovieForbiddenResponse.model_validate(response.json())
-        assert not db_helper.movie_exists_by_name(movie_data.name)
+        # assert not db_helper.movie_exists_by_name(movie_data.name)
+        if db_helper.movie_exists_by_name(movie_data.name):
+            raise AssertionError(
+                f"Фильм {movie_data.name} создан в БД, "
+                "ожидалось, что фильм не будет создан"
+            )
 
     @pytest.mark.smoke
     @pytest.mark.negative
@@ -142,12 +151,20 @@ class TestMoviesAPINegative:
             db_helper: DBHelper,
             expected_status: HTTPStatus = HTTPStatus.FORBIDDEN,
     ):
-        assert db_helper.get_movie_by_id(created_movie_and_cleanup.id)
+        # assert db_helper.get_movie_by_id(created_movie_and_cleanup.id)
+        if not db_helper.get_movie_by_id(created_movie_and_cleanup.id):
+            raise AssertionError(
+                f"Фильм {created_movie_and_cleanup.id} отсутствует в БД"
+            )
         api_manager.auth_api.authenticate((email, password))
         response = api_manager.movies_api.delete_movie(
             created_movie_and_cleanup.id, expected_status=expected_status)
         GetMovieForbiddenResponse.model_validate(response.json())
-        assert db_helper.get_movie_by_id(created_movie_and_cleanup.id)
+        # assert db_helper.get_movie_by_id(created_movie_and_cleanup.id)
+        if not db_helper.get_movie_by_id(created_movie_and_cleanup.id):
+            raise AssertionError(
+                f"Фильм {created_movie_and_cleanup.id} отсутствует в БД"
+            )
 
     @pytest.mark.smoke
     @pytest.mark.negative
@@ -169,7 +186,11 @@ class TestMoviesAPINegative:
             db_helper: DBHelper,
             expected_status: HTTPStatus = HTTPStatus.FORBIDDEN,
     ):
-        assert db_helper.get_movie_by_id(created_movie_and_cleanup.id)
+        # assert db_helper.get_movie_by_id(created_movie_and_cleanup.id)
+        if not db_helper.get_movie_by_id(created_movie_and_cleanup.id):
+            raise AssertionError(
+                f"Фильм {created_movie_and_cleanup.id} отсутствует в БД"
+            )
         api_manager.auth_api.authenticate((email, password))
         change_movie_data = MovieInfoRequest(
             **MovieConstants.PATCH_MOVIE_DATA_NEGATIVE_CASES
@@ -179,7 +200,11 @@ class TestMoviesAPINegative:
             change_movie_data.model_dump(mode="json"),
             expected_status=expected_status)
         GetMovieForbiddenResponse.model_validate(response.json())
-        assert db_helper.movie_exists_by_name(created_movie_and_cleanup.name)
+        # assert db_helper.movie_exists_by_name(created_movie_and_cleanup.name)
+        if not db_helper.movie_exists_by_name(created_movie_and_cleanup.name):
+            raise AssertionError(
+                f"Фильм с названием {created_movie_and_cleanup.name} отсутствует в БД"
+            )
 
     @pytest.mark.smoke
     @pytest.mark.negative
@@ -203,8 +228,12 @@ class TestMoviesAPINegative:
         response = super_admin.api.movies_api.post_movie(
             movie_data, expected_status=HTTPStatus.CONFLICT)
         GetMovieConflictResponse.model_validate(response.json())
-        assert db_helper.movie_count_by_name(
-            created_movie_and_cleanup.name) == 1
+        # assert db_helper.movie_count_by_name(
+        #     created_movie_and_cleanup.name) == 1
+        if db_helper.movie_count_by_name(created_movie_and_cleanup.name) != 1:
+            raise AssertionError(
+                f"Фильмов с названием {created_movie_and_cleanup.name} в БД больше одного"
+            )
 
     @allure.story(
         "Негативный тест на изменение афиши фильма с пустыми данными")

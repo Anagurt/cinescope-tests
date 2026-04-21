@@ -23,7 +23,6 @@ from tests.constants.auth_cases import (
     LOGIN_EMPTY_FIELDS_IDS,
 )
 
-
 @allure.feature("Негативные тесты для auth API")
 class TestAuthAPINegative:
 
@@ -43,9 +42,8 @@ class TestAuthAPINegative:
             password: str,
             password_repeat: str,
             api_manager,
-            request,
             db_helper: DBHelper,
-            expected_status: HTTPStatus = HTTPStatus.BAD_REQUEST,
+            expected_status: HTTPStatus = HTTPStatus.BAD_REQUEST
     ):
         register_data = {
             "email": email,
@@ -53,17 +51,18 @@ class TestAuthAPINegative:
             "password": password,
             "passwordRepeat": password_repeat
         }
-        response = api_manager.auth_api.register_user(
-            user_data=register_data, expected_status=expected_status)
-        register_user_response = RegisterUserBadRequestResponse.model_validate(
-            response.json())
-        message_response = request.node.callspec.id
-        text = f"{message_response}\n\n" + "\n".join(
-            f'"{message}"' for message in register_user_response.message)
-        allure.attach(text,
-                      name="Сообщения об ошибках API",
-                      attachment_type=allure.attachment_type.TEXT)
-        assert not db_helper.user_exists_by_email(email)
+        api_manager.auth_api.register_user(
+            user_data=register_data,
+            expected_status=expected_status,
+            response_model=RegisterUserBadRequestResponse,
+            attach_error_messages=True,
+        )
+        if db_helper.user_exists_by_email(email):
+            raise AssertionError(
+                f"Пользователь {email} зарегистрирован в БД, "
+                "ожидалось, что пользователь не сможет зарегистрироваться"
+            )
+        # assert not db_helper.user_exists_by_email(email)
 
     @pytest.mark.smoke
     @pytest.mark.negative
@@ -90,7 +89,12 @@ class TestAuthAPINegative:
             "password": password,
             "passwordRepeat": password_repeat
         }
-        assert db_helper.user_exists_by_email(email)
+        if not db_helper.user_exists_by_email(email):
+            raise AssertionError(
+                f"Пользователь {email} не существует в БД, "
+                "ожидался существующий пользователь"
+            )
+        # assert db_helper.user_exists_by_email(email)
         response = api_manager.auth_api.register_user(
             user_data=register_data, expected_status=expected_status)
         register_user_response = RegisterUserConflictResponse.model_validate(
@@ -99,7 +103,12 @@ class TestAuthAPINegative:
             register_user_response.message
             == "Пользователь с таким email уже зарегистрирован"
         )
-        assert db_helper.user_count_by_email(email) == 1
+        # assert db_helper.user_count_by_email(email) == 1
+        if db_helper.user_count_by_email(email) != 1:
+            raise AssertionError(
+                f"Пользователь {email} должен быть зарегистрирован в БД, "
+                "но количество пользователей с таким email должно быть равно 1"
+            )
 
     @pytest.mark.smoke
     @pytest.mark.negative
@@ -117,9 +126,8 @@ class TestAuthAPINegative:
             password: str,
             password_repeat: str,
             api_manager,
-            request,
             db_helper: DBHelper,
-            expected_status: HTTPStatus = HTTPStatus.BAD_REQUEST,
+            expected_status: HTTPStatus = HTTPStatus.BAD_REQUEST
     ):
         register_data = {
             "email": email,
@@ -127,17 +135,17 @@ class TestAuthAPINegative:
             "password": password,
             "passwordRepeat": password_repeat
         }
-        response = api_manager.auth_api.register_user(
-            user_data=register_data, expected_status=expected_status)
-        register_user_response = RegisterUserBadRequestResponse.model_validate(
-            response.json())
-        message_response = request.node.callspec.id
-        text = f"{message_response}\n\n" + "\n".join(
-            f'"{m}"' for m in register_user_response.message)
-        allure.attach(text,
-                      name="Сообщения об ошибках API",
-                      attachment_type=allure.attachment_type.TEXT)
-        assert not db_helper.user_exists_by_email(email)
+        api_manager.auth_api.register_user(
+            user_data=register_data,
+            expected_status=expected_status,
+            response_model=RegisterUserBadRequestResponse,
+            attach_error_messages=True,
+        )
+        # assert not db_helper.user_exists_by_email(email)
+        if db_helper.user_exists_by_email(email):
+            raise AssertionError(
+                f"После неуспешной регистрации пользователь {email} не должен появиться в БД"
+            )
 
     @pytest.mark.smoke
     @pytest.mark.negative
@@ -149,14 +157,22 @@ class TestAuthAPINegative:
             api_manager: ApiManager,
             db_helper: DBHelper,
             expected_status: HTTPStatus = HTTPStatus.UNAUTHORIZED):
-        assert not db_helper.user_exists_by_email(test_user.email)
+        if db_helper.user_exists_by_email(test_user.email):
+            raise AssertionError(
+                f"Пользователь {test_user.email} уже существует в БД, "
+                "ожидался незарегистрированный пользователь"
+            )
         login_data = {"email": test_user.email, "password": test_user.password}
         response = api_manager.auth_api.login_user(
             login_data=login_data, expected_status=expected_status)
         login_user_response = LoginUserUnauthorizedResponse.model_validate(
             response.json())
         assert login_user_response.message == "Неверный логин или пароль"
-        assert not db_helper.user_exists_by_email(test_user.email)
+        if db_helper.user_exists_by_email(test_user.email):
+            raise AssertionError(
+                f"После неуспешного логина пользователь {test_user.email} не должен появиться в БД"
+            )
+
 
     @pytest.mark.smoke
     @pytest.mark.negative

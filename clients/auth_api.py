@@ -3,6 +3,7 @@ from __future__ import annotations
 from http import HTTPStatus
 
 from requests import Session, Response
+from pydantic import BaseModel
 
 from constants import (
     BASE_AUTH_URL,
@@ -24,17 +25,30 @@ class AuthAPI(CustomRequester):
     def register_user(
             self,
             user_data: dict,
-            expected_status: HTTPStatus = HTTPStatus.CREATED) -> Response:
+            expected_status: HTTPStatus = HTTPStatus.CREATED,
+            response_model: type[BaseModel] | None = None,
+            attach_error_messages: bool = False,
+            allure_attachment_name: str = "Сообщения об ошибках API",
+    ) -> Response:
         """
         Регистрация нового пользователя.
         :param user_data: Данные пользователя.
-        :param expected_status: Ожидаемый статус-код.
+            endpoint=REGISTER_ENDPOINT,
+            data=user_data,
+            expected_status=expected_status,
+            response_model=response_model,
+            attach_error_messages=attach_error_messages,
+            allure_attachment_name=allure_attachment_name,
+
         """
         return self.send_request(
             method="POST",
             endpoint=REGISTER_ENDPOINT,
             data=user_data,
             expected_status=expected_status,
+            response_model=response_model,
+            attach_error_messages=attach_error_messages,
+            allure_attachment_name=allure_attachment_name,
         )
 
     def login_user(self,

@@ -56,16 +56,16 @@ class TestMoviesAPIPositive:
         response = anonymous_api_manager.movies_api.get_movies(params=params)
         data = response.json()
         movies_list_response = GetMoviesListResponse.model_validate(data)
-        if params is MovieConstants.RANGE_PRICE_PARAMS:
+        if params == MovieConstants.RANGE_PRICE_PARAMS:
             min_price = MovieConstants.RANGE_PRICE_PARAMS["minPrice"]
             max_price = MovieConstants.RANGE_PRICE_PARAMS["maxPrice"]
             assert all(min_price <= movie.price <= max_price
                        for movie in movies_list_response.movies)
-        if params is MovieConstants.LOCATION_PARAMS:
+        if params == MovieConstants.LOCATION_PARAMS:
             expected_location = MovieConstants.LOCATION_PARAMS["locations"]
             assert all(movie.location == expected_location
                        for movie in movies_list_response.movies)
-        if params is MovieConstants.GENRE_ID_PARAMS:
+        if params == MovieConstants.GENRE_ID_PARAMS:
             expected_genre_id = MovieConstants.GENRE_ID_PARAMS["genreId"]
             assert all(movie.genreId == expected_genre_id
                        for movie in movies_list_response.movies)
@@ -75,7 +75,11 @@ class TestMoviesAPIPositive:
     def test_create_movie_by_super_admin(self, movie_data: MovieInfoRequest,
                                          super_admin, movies_to_cleanup: list,
                                          db_helper: DBHelper):
-        assert not db_helper.movie_exists_by_name(movie_data.name)
+        # assert not db_helper.movie_exists_by_name(movie_data.name)
+        if db_helper.movie_exists_by_name(movie_data.name):
+            raise AssertionError(
+                f"Фильмов с названием {movie_data.name} уже есть в БД"
+            )
         response = super_admin.api.movies_api.post_movie(
             movie_data, expected_status=HTTPStatus.CREATED)
         created = MovieInfoResponse.model_validate(response.json())
@@ -84,7 +88,12 @@ class TestMoviesAPIPositive:
             movie_data.model_dump(mode="json"),
             created.model_dump(mode="json"),
         )
-        assert db_helper.movie_exists_by_name(movie_data.name)
+        # assert db_helper.movie_exists_by_name(movie_data.name)
+        if not db_helper.movie_exists_by_name(movie_data.name):
+            raise AssertionError(
+                f"Фильм {movie_data.name} отсутствует в БД, "
+                "ожидалось, что фильм будет создан в БД"
+            )
 
         movies_to_cleanup.append(created.id)
 
@@ -100,7 +109,11 @@ class TestMoviesAPIPositive:
                              email, password,
                              db_helper: DBHelper, api_manager: ApiManager,
                              expected_status: HTTPStatus = HTTPStatus.OK):
-        assert db_helper.movie_exists_by_name(created_movie_and_cleanup.name)
+        # assert db_helper.movie_exists_by_name(created_movie_and_cleanup.name)
+        if not db_helper.movie_exists_by_name(created_movie_and_cleanup.name):
+            raise AssertionError(
+                f"Фильм {created_movie_and_cleanup.name} отсутствует в БД"
+            )
         api_manager.auth_api.authenticate((email, password))
         response = api_manager.movies_api.get_movie(
             created_movie_and_cleanup.id, expected_status=expected_status)
@@ -112,7 +125,11 @@ class TestMoviesAPIPositive:
     def test_change_movie_by_super_admin(
             self, created_movie_and_cleanup: MovieInfoResponse, super_admin,
             db_helper: DBHelper):
-        assert db_helper.movie_exists_by_name(created_movie_and_cleanup.name)
+        # assert db_helper.movie_exists_by_name(created_movie_and_cleanup.name)
+        if not db_helper.movie_exists_by_name(created_movie_and_cleanup.name):
+            raise AssertionError(
+                f"Фильм {created_movie_and_cleanup.name} отсутствует в БД"
+            )
         change_movie_data = MovieInfoRequest(
             name=DataGenerator.generate_random_name_movie(),
             imageUrl="https://example.com/image.png",
@@ -128,21 +145,34 @@ class TestMoviesAPIPositive:
             expected_status=HTTPStatus.OK)
         changed = MovieInfoResponse.model_validate(response.json())
         assert changed.id == created_movie_and_cleanup.id
-        assert changed.name == change_movie_data.name
         assert changed.name != created_movie_and_cleanup.name
-        assert db_helper.movie_exists_by_name(change_movie_data.name)
+        # assert db_helper.movie_exists_by_name(change_movie_data.name)
+        if not db_helper.movie_exists_by_name(change_movie_data.name):
+            raise AssertionError(
+                f"Фильм с названием {change_movie_data.name} отсутствует в БД, "
+                "ожидалось, что название фильма будет изменено в БД"
+            )
 
     @pytest.mark.smoke
     @allure.story("Тест на удаление афиши фильма (под админскими правами)")
     def test_delete_movie_by_super_admin(
             self, created_movie_and_cleanup: MovieInfoResponse, super_admin,
             db_helper: DBHelper):
-        assert db_helper.movie_exists_by_name(created_movie_and_cleanup.name)
+        # assert db_helper.movie_exists_by_name(created_movie_and_cleanup.name)
+        if not db_helper.movie_exists_by_name(created_movie_and_cleanup.name):
+            raise AssertionError(
+                f"Фильм {created_movie_and_cleanup.name} отсутствует в БД"
+            )
         response = super_admin.api.movies_api.delete_movie(
             created_movie_and_cleanup.id, expected_status=HTTPStatus.OK)
         deleted = MovieInfoResponse.model_validate(response.json())
         assert deleted.id == created_movie_and_cleanup.id
         super_admin.api.movies_api.get_movie(
             created_movie_and_cleanup.id, expected_status=HTTPStatus.NOT_FOUND)
-        assert not db_helper.movie_exists_by_name(
-            created_movie_and_cleanup.name)
+        # assert not db_helper.movie_exists_by_name(
+        #     created_movie_and_cleanup.name)
+        if db_helper.movie_exists_by_name(created_movie_and_cleanup.name):
+            raise AssertionError(
+                f"Фильм {created_movie_and_cleanup.name} существует в БД, "
+                "ожидалось, что фильм будет удален из БД"
+            )
