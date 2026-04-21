@@ -33,6 +33,9 @@ class TestUserAPIPositive:
         response = super_admin.api.user_api.create_user(
             user_data=creation_user_data.model_dump(mode="json"))
         create_user_response = UserInfoResponse.model_validate(response.json())
+
+        users_to_cleanup.append(create_user_response.id)
+
         assert (
             create_user_response.email == creation_user_data.email
         ), "Email не совпадает"
@@ -42,7 +45,6 @@ class TestUserAPIPositive:
                 f"Пользователь {creation_user_data.email} не существует в БД, "
                 "ожидалось, что пользователь будет создан в БД"
             )
-        users_to_cleanup.append(create_user_response.id)
 
     @pytest.mark.smoke
     @allure.story(
@@ -59,7 +61,8 @@ class TestUserAPIPositive:
             user_id=user_locator, expected_status=expected_status)
         by_locator = UserInfoResponse.model_validate(
             response_by_locator.json())
-        assert by_locator.id == RegularUserCreds.ID
+
+        assert by_locator.id == RegularUserCreds.ID, "ID не совпадает"
         assert by_locator.email == RegularUserCreds.USERNAME, "Email не совпадает"
 
     @pytest.mark.smoke
@@ -71,13 +74,23 @@ class TestUserAPIPositive:
                          common_user: User,
                          db_helper: DBHelper,
                          expected_status: HTTPStatus = HTTPStatus.OK):
-        assert db_helper.user_exists_by_email(common_user.email)
+        # assert db_helper.user_exists_by_email(common_user.email)
+        if not db_helper.user_exists_by_email(common_user.email):
+            raise AssertionError(
+                f"Пользователь {common_user.email} не существует в БД"
+            )
+
         response = super_admin.api.user_api.delete_user(
             common_user.id, expected_status=expected_status)
-
         delete_response = UserInfoResponse.model_validate(response.json())
-        assert delete_response.id == common_user.id
-        assert not db_helper.user_exists_by_email(common_user.email)
+
+        assert delete_response.id == common_user.id, "ID не совпадает"
+        # assert not db_helper.user_exists_by_email(common_user.email)
+        if db_helper.user_exists_by_email(common_user.email):
+            raise AssertionError(
+                f"Пользователь {common_user.email} существует в БД, "
+                "ожидалось удаление из БД только что созданного пользователя"
+            )
 
     @pytest.mark.smoke
     @allure.story("Тест на удаление пользователя с пустым телом ответа")

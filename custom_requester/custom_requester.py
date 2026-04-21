@@ -124,7 +124,11 @@ class CustomRequester:
         messages = message_value if isinstance(message_value, list) else [message_value]
         case_id = self._extract_pytest_case_id()
         text = f"{case_id}\n\n" + "\n".join(f'"{message}"' for message in messages)
-        allure.attach(text, name=attachment_name, attachment_type=allure.attachment_type.TEXT)
+        allure.attach(
+            text,
+            name=attachment_name,
+            attachment_type=allure.attachment_type.TEXT,
+        )
 
     def _update_session_headers(self, **kwargs: str) -> None:
         """

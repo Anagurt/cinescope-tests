@@ -81,7 +81,7 @@ class MovieConstants:
     }
 
 
-class MovieOperations:
-    GET = "get"
-    DELETE = "delete"
-    PATCH = "patch"
+class MovieMethods:
+    GET = "get_movie"
+    DELETE = "delete_movie"
+    PATCH = "patch_movie"

@@ -36,12 +36,15 @@ class TestAuthAPIPositive:
             user_data=test_user.model_dump(mode="json"))
         register_user_response = RegisterUserResponse.model_validate(
             response.json())
-        assert register_user_response.email == test_user.email, "Email не совпадает"
+
         users_to_cleanup.append(register_user_response.id)
+
+        assert register_user_response.email == test_user.email, "Email не совпадает"
         # assert db_helper.user_exists_by_email(test_user.email)
         if not db_helper.user_exists_by_email(test_user.email):
             raise AssertionError(
-                f"После успешной регистрации пользователь {test_user.email} должен появиться в БД"
+                f"После успешной регистрации пользователь {test_user.email} "
+                "должен появиться в БД"
             )
 
     @pytest.mark.smoke
@@ -51,12 +54,23 @@ class TestAuthAPIPositive:
         LOGIN_EXIST_USERS_CASES,
         ids=LOGIN_EXIST_USERS_IDS,
     )
-    def test_login_user(self, api_manager: ApiManager, email: str, password: str,
-                        expected_status: HTTPStatus = HTTPStatus.OK):
+    def test_login_user(
+            self,
+            api_manager: ApiManager,
+            email: str,
+            password: str,
+            db_helper: DBHelper,
+            expected_status: HTTPStatus = HTTPStatus.OK,
+    ):
         login_payload = LoginUserRequest(email=email, password=password)
         login_data = login_payload.model_dump(mode="json")
+        if not db_helper.user_exists_by_email(email):
+            raise AssertionError(
+                f"Пользователь {email} отсутствует в БД"
+            )
 
         response = api_manager.auth_api.login_user(
             login_data=login_data, expected_status=expected_status)
         body = LoginResponse.model_validate(response.json())
-        assert body.user.email == email
+
+        assert body.user.email == login_data["email"], "Email не совпадает"

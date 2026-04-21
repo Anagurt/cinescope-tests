@@ -1,17 +1,7 @@
-from constants import MovieConstants, MovieOperations
+from constants import MovieConstants, MovieMethods
 from resources.user_creds import RegularUserCreds, AdminCreds
 import pytest
 
-GET_MOVIES_PARAMS_CASES = [
-    MovieConstants.RANGE_PRICE_PARAMS,
-    MovieConstants.LOCATION_PARAMS,
-    MovieConstants.GENRE_ID_PARAMS,
-]
-GET_MOVIES_PARAMS_IDS = [
-    "Фильмы в диапазоне цен",
-    "Фильмы в Москве",
-    "Фильмы в жанре с ID 1",
-]
 
 INVALID_GET_MOVIES_PARAMS_CASES = [
     MovieConstants.INVALID_PAGE_PARAMS,
@@ -55,13 +45,13 @@ INVALID_MOVIE_FIELDS_IDS = [
     "Значение genreId равно 0",
 ]
 
-HTTP_MOVIE_OPERATIONS_CASES = [
-    MovieOperations.GET,
-    MovieOperations.DELETE,
-    MovieOperations.PATCH
+MOVIE_METHODS_CASES = [
+    MovieMethods.GET,
+    MovieMethods.DELETE,
+    MovieMethods.PATCH
 ]
 
-HTTP_MOVIE_OPERATIONS_IDS = [
+MOVIE_METHODS_IDS = [
     "GET несуществующего фильма",
     "DELETE несуществующего фильма",
     "PATCH несуществующего фильма",

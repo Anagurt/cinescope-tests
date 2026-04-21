@@ -23,6 +23,7 @@ from tests.constants.auth_cases import (
     LOGIN_EMPTY_FIELDS_IDS,
 )
 
+
 @allure.feature("Негативные тесты для auth API")
 class TestAuthAPINegative:
 
@@ -99,10 +100,10 @@ class TestAuthAPINegative:
             user_data=register_data, expected_status=expected_status)
         register_user_response = RegisterUserConflictResponse.model_validate(
             response.json())
-        assert (
-            register_user_response.message
-            == "Пользователь с таким email уже зарегистрирован"
-        )
+        assert register_user_response.message == (
+            "Пользователь с таким email уже зарегистрирован"
+        ), "Сообщение об ошибке не совпадает с ожидаемым"
+
         # assert db_helper.user_count_by_email(email) == 1
         if db_helper.user_count_by_email(email) != 1:
             raise AssertionError(
@@ -144,7 +145,8 @@ class TestAuthAPINegative:
         # assert not db_helper.user_exists_by_email(email)
         if db_helper.user_exists_by_email(email):
             raise AssertionError(
-                f"После неуспешной регистрации пользователь {email} не должен появиться в БД"
+                f"После неуспешной регистрации пользователь {email} "
+                "не должен появиться в БД"
             )
 
     @pytest.mark.smoke
@@ -163,16 +165,20 @@ class TestAuthAPINegative:
                 "ожидался незарегистрированный пользователь"
             )
         login_data = {"email": test_user.email, "password": test_user.password}
+
         response = api_manager.auth_api.login_user(
             login_data=login_data, expected_status=expected_status)
         login_user_response = LoginUserUnauthorizedResponse.model_validate(
             response.json())
-        assert login_user_response.message == "Неверный логин или пароль"
+
+        assert login_user_response.message == (
+            "Неверный логин или пароль"
+        ), "Сообщение об ошибке не совпадает с ожидаемым"
         if db_helper.user_exists_by_email(test_user.email):
             raise AssertionError(
-                f"После неуспешного логина пользователь {test_user.email} не должен появиться в БД"
+                f"После неуспешного логина пользователь {test_user.email} "
+                "не должен появиться в БД"
             )
-
 
     @pytest.mark.smoke
     @pytest.mark.negative
@@ -191,8 +197,12 @@ class TestAuthAPINegative:
             expected_status: HTTPStatus = HTTPStatus.UNAUTHORIZED,
     ):
         login_data = {"email": email, "password": password}
+
         response = api_manager.auth_api.login_user(
             login_data=login_data, expected_status=expected_status)
         login_user_response = LoginUserUnauthorizedResponse.model_validate(
             response.json())
-        assert login_user_response.message == "Неверный логин или пароль"
+
+        assert login_user_response.message == (
+            "Неверный логин или пароль"
+        ), "Сообщение об ошибке не совпадает с ожидаемым"
