@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 class MoviesDbCreds:
     """
     Класс для хранения учетных данных для доступа к базе данных фильмов

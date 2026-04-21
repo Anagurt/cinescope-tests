@@ -2,7 +2,6 @@ import json
 import logging
 import os
 from http import HTTPStatus
-from typing import Optional
 
 import requests
 from pydantic import BaseModel
@@ -19,7 +18,7 @@ class CustomRequester:
         "Accept": "application/json",
     }
 
-    def __init__(self, session: requests.Session, base_url: str):
+    def __init__(self, session: requests.Session, base_url: str) -> None:
         """
         Инициализация кастомного реквестера.
         :param session: Объект requests.Session.
@@ -37,15 +36,16 @@ class CustomRequester:
         endpoint: str,
         data: dict = None,
         params: dict = None,
-        expected_status: Optional[HTTPStatus] = HTTPStatus.OK,
+        expected_status: HTTPStatus | None = HTTPStatus.OK,
         need_logging: bool = True,
-    ):
+    ) -> requests.Response:
         """
         Универсальный метод для отправки запросов.
         :param method: HTTP метод (GET, POST, PUT, DELETE и т.д.).
         :param endpoint: Эндпоинт (например, "/login").
         :param data: Тело запроса (JSON-данные).
-        :param expected_status: Ожидаемый статус-код (по умолчанию 200). Если None — проверка не выполняется.
+        :param expected_status: Ожидаемый статус-код (по умолчанию 200).
+            Если None — проверка не выполняется.
         :param need_logging: Флаг для логирования (по умолчанию True).
         :return: Объект ответа requests.Response.
         """
@@ -59,13 +59,15 @@ class CustomRequester:
                                         params=params)
         if need_logging:
             self.log_request_and_response(response)
-        if expected_status is not None and response.status_code != expected_status:
+        if (expected_status is not None
+                and response.status_code != expected_status):
             raise ValueError(
-                f"Unexpected status code: {response.status_code}. Expected: {expected_status}"
+                f"Unexpected status code: {response.status_code}. "
+                f"Expected: {expected_status}"
             )
         return response
 
-    def _update_session_headers(self, **kwargs: str):
+    def _update_session_headers(self, **kwargs: str) -> None:
         """
         Обновление заголовков сессии.
         :param kwargs: Дополнительные заголовки.
@@ -73,7 +75,7 @@ class CustomRequester:
         self.headers.update(kwargs)
         self.session.headers.update(self.headers)
 
-    def log_request_and_response(self, response: requests.Response):
+    def log_request_and_response(self, response: requests.Response) -> None:
         """
         Логирование запросов и ответов.
         :param response: Объект ответа requests.Response.
@@ -90,7 +92,9 @@ class CustomRequester:
                 f"-H '{header}: {value}'"
                 for header, value in request.headers.items()
             ])
-            full_test_name = f"pytest {os.environ.get('PYTEST_CURRENT_TEST', '').replace(' (call)', '')}"
+            current_test = os.environ.get("PYTEST_CURRENT_TEST", "").replace(
+                " (call)", "")
+            full_test_name = f"pytest {current_test}"
 
             body = ""
             if hasattr(request, 'body') and request.body is not None:

@@ -11,7 +11,6 @@ from models.base_models_auth import RegisterUserRequest
 from models.base_model_movies import MovieInfoRequest, MovieInfoResponse
 from resources.user_creds import RegularUserCreds, SuperAdminCreds
 from utils.data_generator import DataGenerator
-from typing import List 
 from sqlalchemy.orm import Session
 from db_requester.db_client import get_db_session
 from db_requester.db_helpers import DBHelper
@@ -44,7 +43,7 @@ def user_session() -> ApiManager:
     """
     user_pool = []
 
-    def _create_user_session():
+    def _create_user_session() -> ApiManager:
         session = requests.Session()
         user_session = ApiManager(session)
         user_pool.append(user_session)
@@ -109,7 +108,8 @@ def creation_user_data(test_user: RegisterUserRequest) -> RegisterUserRequest:
 
 
 @pytest.fixture
-def common_user(user_session, super_admin, creation_user_data) -> User:
+def common_user(user_session: ApiManager, super_admin: User,
+                creation_user_data: RegisterUserRequest) -> User:
     """
     Фикстура для создания обычного пользователя (объект класса User)
     """
@@ -139,7 +139,7 @@ def _delete_ok_or_gone(response: requests.Response, context: str) -> None:
 
 
 @pytest.fixture()
-def users_to_cleanup(super_admin: User) -> List[str]:
+def users_to_cleanup(super_admin: User) -> list[str]:
     created_user_ids = []
 
     yield created_user_ids
@@ -153,6 +153,7 @@ def users_to_cleanup(super_admin: User) -> List[str]:
 
 # _______________________________________________________________________________
 # Фикстуры для MoviesAPI
+
 
 @pytest.fixture()
 def movie_data() -> MovieInfoRequest:
@@ -171,7 +172,8 @@ def movie_data() -> MovieInfoRequest:
 
 
 @pytest.fixture()
-def created_movie_and_cleanup(super_admin: User, movie_data: MovieInfoRequest) -> MovieInfoResponse:
+def created_movie_and_cleanup(
+        super_admin: User, movie_data: MovieInfoRequest) -> MovieInfoResponse:
     """
     Фикстура для создания фильма и удаления его после теста.
     """
@@ -192,7 +194,7 @@ def created_movie_and_cleanup(super_admin: User, movie_data: MovieInfoRequest) -
 
 
 @pytest.fixture(scope="function")
-def movies_to_cleanup(super_admin: User) -> List[int]:
+def movies_to_cleanup(super_admin: User) -> list[int]:
     """
     Список id фильмов на удаление в конце сессии для подчистки фильмов с меткой в name.
     """
@@ -211,6 +213,7 @@ def movies_to_cleanup(super_admin: User) -> List[int]:
 
 # Фикстуры для работы с БД (SQLAlchemy)
 
+
 @pytest.fixture(scope="module")
 def db_session() -> Session:
     """
@@ -220,6 +223,7 @@ def db_session() -> Session:
     db_session = get_db_session()
     yield db_session
     db_session.close()
+
 
 @pytest.fixture(scope="function")
 def db_helper(db_session: Session) -> DBHelper:
@@ -241,6 +245,7 @@ def created_test_user(db_helper: DBHelper) -> UserDBModel:
     # Cleanup после теста
     if db_helper.get_user_by_id(user.id):
         db_helper.delete_user(user)
+
 
 @pytest.fixture(scope="function")
 def created_test_movie(db_helper: DBHelper) -> MovieDBModel:

@@ -9,9 +9,20 @@ from models.base_models_auth import (
     RegisterUserBadRequestResponse,
     RegisterUserConflictResponse,
 )
-from resources.user_creds import RegularUserCreds, SuperAdminCreds
+
 from db_requester.db_helpers import DBHelper
 from clients.api_manager import ApiManager
+from tests.constants.auth_cases import (
+    REGISTER_EMPTY_FIELDS_CASES,
+    REGISTER_EMPTY_FIELDS_IDS,
+    REGISTER_ALREADY_EXISTS_CASES,
+    REGISTER_ALREADY_EXISTS_IDS,
+    REGISTER_INVALID_FIELDS_CASES,
+    REGISTER_INVALID_FIELDS_IDS,
+    LOGIN_EMPTY_FIELDS_CASES,
+    LOGIN_EMPTY_FIELDS_IDS,
+)
+
 
 @allure.feature("Негативные тесты для auth API")
 class TestAuthAPINegative:
@@ -21,28 +32,26 @@ class TestAuthAPINegative:
     @allure.story(
         "Негативный тест на регистрацию пользователя с пустыми полями")
     @pytest.mark.parametrize(
-        "email, fullName, password, passwordRepeat, expected_status", [
-            ("", "ФИО пользователя", "asdqwe123Q!", "asdqwe123Q!",
-             HTTPStatus.BAD_REQUEST),
-            ("test.register0@email.com", "ФИО пользователя", "", "asdqwe123Q!",
-             HTTPStatus.BAD_REQUEST),
-            ("test.register1@email.com", "", "asdqwe123Q!", "asdqwe123Q!",
-             HTTPStatus.BAD_REQUEST),
-            ("test.register2@email.com", "ФИО пользователя", "asdqwe123Q!", "",
-             HTTPStatus.BAD_REQUEST),
-        ],
-        ids=[
-            "Пустой email", "Пустой password", "Пустой fullName",
-            "Пустой passwordRepeat"
-        ])
-    def test_register_user_with_empty_fields(self, email: str, fullName: str, password: str,
-                                             passwordRepeat: str, expected_status: HTTPStatus,
-                                             api_manager, request, db_helper: DBHelper):
+        "email, full_name, password, password_repeat",
+        REGISTER_EMPTY_FIELDS_CASES,
+        ids=REGISTER_EMPTY_FIELDS_IDS,
+    )
+    def test_register_user_with_empty_fields(
+            self,
+            email: str,
+            full_name: str,
+            password: str,
+            password_repeat: str,
+            api_manager,
+            request,
+            db_helper: DBHelper,
+            expected_status: HTTPStatus = HTTPStatus.BAD_REQUEST,
+    ):
         register_data = {
             "email": email,
-            "fullName": fullName,
+            "fullName": full_name,
             "password": password,
-            "passwordRepeat": passwordRepeat
+            "passwordRepeat": password_repeat
         }
         response = api_manager.auth_api.register_user(
             user_data=register_data, expected_status=expected_status)
@@ -61,65 +70,62 @@ class TestAuthAPINegative:
     @allure.story(
         "Негативный тест на регистрацию уже существующего пользователя")
     @pytest.mark.parametrize(
-        "email, fullName, password, passwordRepeat, expected_status",
-        [(f"{SuperAdminCreds.USERNAME}", "ФИО пользователя",
-          f"{SuperAdminCreds.PASSWORD}", f"{SuperAdminCreds.PASSWORD}",
-          HTTPStatus.CONFLICT),
-         (f"{RegularUserCreds.USERNAME}", "ФИО пользователя",
-          f"{RegularUserCreds.PASSWORD}", f"{RegularUserCreds.PASSWORD}",
-          HTTPStatus.CONFLICT)],
-        ids=[
-            "Регистрация уже существующего супер-админа",
-            "Регистрация уже существующего пользователя"
-        ])
-    def test_register_already_exist_user(self, email: str, fullName: str, password: str,
-                                         passwordRepeat: str, expected_status: HTTPStatus,
-                                         api_manager: ApiManager, db_helper: DBHelper):
+        "email, full_name, password, password_repeat",
+        REGISTER_ALREADY_EXISTS_CASES,
+        ids=REGISTER_ALREADY_EXISTS_IDS,
+    )
+    def test_register_already_exist_user(
+            self,
+            email: str,
+            full_name: str,
+            password: str,
+            password_repeat: str,
+            api_manager: ApiManager,
+            db_helper: DBHelper,
+            expected_status: HTTPStatus = HTTPStatus.CONFLICT,
+    ):
         register_data = {
             "email": email,
-            "fullName": fullName,
+            "fullName": full_name,
             "password": password,
-            "passwordRepeat": passwordRepeat
+            "passwordRepeat": password_repeat
         }
         assert db_helper.user_exists_by_email(email)
         response = api_manager.auth_api.register_user(
             user_data=register_data, expected_status=expected_status)
         register_user_response = RegisterUserConflictResponse.model_validate(
             response.json())
-        assert register_user_response.message == "Пользователь с таким email уже зарегистрирован"
+        assert (
+            register_user_response.message
+            == "Пользователь с таким email уже зарегистрирован"
+        )
         assert db_helper.user_count_by_email(email) == 1
-
 
     @pytest.mark.smoke
     @pytest.mark.negative
     @allure.story(
         "Негативный тест на регистрацию пользователя с невалидными полями")
     @pytest.mark.parametrize(
-        "email, fullName, password, passwordRepeat, expected_status",
-        [("test.registeremail.com", "ФИО пользователя", "asdqwe123Q!",
-          "asdqwe123Q!", HTTPStatus.BAD_REQUEST),
-         ("test.register@emailcom", "ФИО пользователя", "asdqwe123Q!",
-          "asdqwe123Q!", HTTPStatus.BAD_REQUEST),
-         ("@email.com", "ФИО пользователя", "asdqwe123Q!", "asdqwe123Q!",
-          HTTPStatus.BAD_REQUEST),
-         ("test.register3@email.com", "ФИО пользователя", "Qwerty7", "Qwerty7",
-          HTTPStatus.BAD_REQUEST),
-         ("test.register4@email.com", "ФИО пользователя",
-          "QwertyuiopasdfghjklzxcvbnmQwer33X",
-          "QwertyuiopasdfghjklzxcvbnmQwer33X", HTTPStatus.BAD_REQUEST)],
-        ids=[
-            "email без символа @", "email без точки",
-            "email без локальной части", "слишком короткий password",
-            "слишком длинный password"
-        ])
-    def test_register_user_with_invalid_fields(self, email: str, fullName: str, password: str,
-                                               passwordRepeat: str, expected_status: HTTPStatus,
-                                               api_manager, request, db_helper: DBHelper):
+        "email, full_name, password, password_repeat",
+        REGISTER_INVALID_FIELDS_CASES,
+        ids=REGISTER_INVALID_FIELDS_IDS,
+    )
+    def test_register_user_with_invalid_fields(
+            self,
+            email: str,
+            full_name: str,
+            password: str,
+            password_repeat: str,
+            api_manager,
+            request,
+            db_helper: DBHelper,
+            expected_status: HTTPStatus = HTTPStatus.BAD_REQUEST,
+    ):
         register_data = {
             "email": email,
-            "fullName": fullName,
+            "fullName": full_name,
             "password": password,
-            "passwordRepeat": passwordRepeat
+            "passwordRepeat": password_repeat
         }
         response = api_manager.auth_api.register_user(
             user_data=register_data, expected_status=expected_status)
@@ -157,12 +163,17 @@ class TestAuthAPINegative:
     @allure.story(
         "Негативный тест на авторизацию пользователя с пустыми полями")
     @pytest.mark.parametrize(
-        "email, password, expected_status",
-        [("", f"{RegularUserCreds.PASSWORD}", HTTPStatus.UNAUTHORIZED),
-         (f"{RegularUserCreds.USERNAME}", "", HTTPStatus.UNAUTHORIZED)],
-        ids=["Пустой email", "Пустой password"])
-    def test_login_user_with_empty_fields(self, email, password,
-                                          expected_status, api_manager):
+        "email, password",
+        LOGIN_EMPTY_FIELDS_CASES,
+        ids=LOGIN_EMPTY_FIELDS_IDS,
+    )
+    def test_login_user_with_empty_fields(
+            self,
+            email,
+            password,
+            api_manager,
+            expected_status: HTTPStatus = HTTPStatus.UNAUTHORIZED,
+    ):
         login_data = {"email": email, "password": password}
         response = api_manager.auth_api.login_user(
             login_data=login_data, expected_status=expected_status)

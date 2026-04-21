@@ -10,15 +10,21 @@ from models.base_models_auth import (
     LoginUserRequest,
     RegisterUserResponse,
 )
-from resources.user_creds import RegularUserCreds, SuperAdminCreds
+
 from db_requester.db_helpers import DBHelper
+from tests.constants.auth_cases import (
+    LOGIN_EXIST_USERS_CASES,
+    LOGIN_EXIST_USERS_IDS
+)
+
 
 @allure.feature("Позитивные тесты для auth API")
 class TestAuthAPIPositive:
 
     @pytest.mark.smoke
     @allure.story("Тест на регистрацию пользователя")
-    def test_register_user(self, api_manager: ApiManager, test_user: RegisterUserRequest,
+    def test_register_user(self, api_manager: ApiManager,
+                           test_user: RegisterUserRequest,
                            users_to_cleanup: list, db_helper: DBHelper):
         assert not db_helper.user_exists_by_email(test_user.email)
         response = api_manager.auth_api.register_user(
@@ -32,14 +38,12 @@ class TestAuthAPIPositive:
     @pytest.mark.smoke
     @allure.story("Тест на авторизацию пользователя")
     @pytest.mark.parametrize(
-        "email, password, expected_status",
-        [(f"{SuperAdminCreds.USERNAME}", f"{SuperAdminCreds.PASSWORD}",
-          HTTPStatus.OK),
-         (f"{RegularUserCreds.USERNAME}", f"{RegularUserCreds.PASSWORD}",
-          HTTPStatus.OK)],
-        ids=["Авторизация супер-админа", "Авторизация пользователя"])
-    def test_login_user(self, api_manager: ApiManager, email, password,
-                        expected_status: HTTPStatus):
+        "email, password",
+        LOGIN_EXIST_USERS_CASES,
+        ids=LOGIN_EXIST_USERS_IDS,
+    )
+    def test_login_user(self, api_manager: ApiManager, email: str, password: str,
+                        expected_status: HTTPStatus = HTTPStatus.OK):
         login_payload = LoginUserRequest(email=email, password=password)
         login_data = login_payload.model_dump(mode="json")
 

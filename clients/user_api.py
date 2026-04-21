@@ -1,7 +1,6 @@
 from http import HTTPStatus
-from typing import Optional
 
-from requests import Session
+from requests import Session, Response
 
 from constants import BASE_AUTH_URL, USER_ENDPOINT
 from custom_requester.custom_requester import CustomRequester
@@ -12,12 +11,12 @@ class UserAPI(CustomRequester):
     Класс для работы с API пользователей
     """
 
-    def __init__(self, session: Session):
+    def __init__(self, session: Session) -> None:
         super().__init__(session=session, base_url=BASE_AUTH_URL)
 
     def get_users(self,
                   user_locator,
-                  expected_status: HTTPStatus = HTTPStatus.OK):
+                  expected_status: HTTPStatus = HTTPStatus.OK) -> Response:
         """
         Получение списка пользователей
         :param user_locator: ID или Email пользователя.
@@ -28,9 +27,9 @@ class UserAPI(CustomRequester):
                                  expected_status=expected_status)
 
     def get_user_info(self,
-                      user_id: Optional[str] = None,
-                      user_email: Optional[str] = None,
-                      expected_status: HTTPStatus = HTTPStatus.OK):
+                      user_id: str | None = None,
+                      user_email: str | None = None,
+                      expected_status: HTTPStatus = HTTPStatus.OK) -> Response:
         """
         Получение информации о пользователе
         :param user_id: ID пользователя.
@@ -45,7 +44,7 @@ class UserAPI(CustomRequester):
 
     def delete_user(self,
                     user_id: str,
-                    expected_status: HTTPStatus = HTTPStatus.OK):
+                    expected_status: HTTPStatus = HTTPStatus.OK) -> Response:
         """
         Удаление пользователя
         :param user_id: ID пользователя.
@@ -57,7 +56,10 @@ class UserAPI(CustomRequester):
             expected_status=expected_status,
         )
 
-    def create_user(self, user_data, expected_status=HTTPStatus.CREATED):
+    def create_user(
+            self,
+            user_data: dict,
+            expected_status: HTTPStatus = HTTPStatus.CREATED) -> Response:
         """
         Создание пользователя
         :param user_data: Данные пользователя.

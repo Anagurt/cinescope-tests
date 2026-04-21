@@ -6,14 +6,18 @@ from faker import Faker
 
 from entities.roles import Roles
 from entities.location import Location
+import os
+import uuid
+
 faker = Faker()
 
 
 class DataGenerator:
 
     @staticmethod
-    def generate_random_email() -> str:
-        return faker.email()
+    def generate_random_email(prefix: str = "user") -> str:
+        worker = os.environ.get("PYTEST_XDIST_WORKER", "gw0")
+        return f"{prefix}.{worker}.{uuid.uuid4().hex[:8]}@email.com"
 
     @staticmethod
     def generate_random_name() -> str:
@@ -75,7 +79,7 @@ class DataGenerator:
             'banned': False,
             'roles': [Roles.USER]
         }
-    
+
     @staticmethod
     def generate_movie_data() -> dict:
         """
@@ -86,7 +90,8 @@ class DataGenerator:
             'name': DataGenerator.generate_random_name_movie(),
             'price': DataGenerator.generate_random_price_movie(),
             'description': DataGenerator.generate_random_description_movie(),
-            'image_url': f"https://example.com/image_{int(random.randint(10000, 1000000))}.png",
+            'image_url':
+            f"https://example.com/image_{int(random.randint(10000, 1000000))}.png",
             'location': random.choice(list(Location)).value,
             'published': True,
             'rating': float(random.randint(1, 10)),

@@ -1,6 +1,6 @@
 from http import HTTPStatus
 
-from requests import Session
+from requests import Session, Response
 
 from constants import BASE_MOVIES_URL, MOVIES_ENDPOINT
 from custom_requester.custom_requester import CustomRequester
@@ -11,13 +11,13 @@ class MoviesAPI(CustomRequester):
     Класс для работы с API фильмов.
     """
 
-    def __init__(self, session: Session):
+    def __init__(self, session: Session) -> None:
         self.session = session
         super().__init__(session=session, base_url=BASE_MOVIES_URL)
 
     def get_movies(self,
                    params: dict = None,
-                   expected_status: HTTPStatus = HTTPStatus.OK):
+                   expected_status: HTTPStatus = HTTPStatus.OK) -> Response:
         """
         Получение списка афиш фильмов.
         :param params: Параметры запроса.
@@ -30,9 +30,10 @@ class MoviesAPI(CustomRequester):
             expected_status=expected_status,
         )
 
-    def post_movie(self,
-                   movie_data: dict,
-                   expected_status: HTTPStatus = HTTPStatus.CREATED):
+    def post_movie(
+            self,
+            movie_data: dict,
+            expected_status: HTTPStatus = HTTPStatus.CREATED) -> Response:
         """
         Создание афиши фильма.
         :param movie_data: Данные афиши фильма.
@@ -47,7 +48,7 @@ class MoviesAPI(CustomRequester):
 
     def get_movie(self,
                   movie_id: int,
-                  expected_status: HTTPStatus = HTTPStatus.OK):
+                  expected_status: HTTPStatus = HTTPStatus.OK) -> Response:
         """
         Получение информации о фильме.
         :param movie_id: ID афиши фильма.
@@ -62,7 +63,7 @@ class MoviesAPI(CustomRequester):
     def patch_movie(self,
                     movie_id: int,
                     change_movie_data: dict,
-                    expected_status: HTTPStatus = HTTPStatus.OK):
+                    expected_status: HTTPStatus = HTTPStatus.OK) -> Response:
         """
         Редактирование афиши фильма.
         :param movie_id: ID афиши фильма.
@@ -78,7 +79,7 @@ class MoviesAPI(CustomRequester):
 
     def delete_movie(self,
                      movie_id: int,
-                     expected_status: HTTPStatus = HTTPStatus.OK):
+                     expected_status: HTTPStatus = HTTPStatus.OK) -> Response:
         """
         Удаление афиши фильма.
         :param movie_id: ID афиши фильма.

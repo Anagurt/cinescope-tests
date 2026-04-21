@@ -1,5 +1,4 @@
 from http import HTTPStatus
-from typing import List
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
@@ -16,7 +15,7 @@ class UserInfoResponse(BaseModel):
     fullName: str = Field(min_length=1,
                           max_length=100,
                           description="Полное имя пользователя")
-    roles: List[Roles]
+    roles: list[Roles]
     verified: bool
     createdAt: str = Field(
         description="Дата и время создания пользователя в формате ISO 8601")
@@ -24,13 +23,7 @@ class UserInfoResponse(BaseModel):
 
     @field_validator("createdAt")
     def validate_created_at(cls, value: str) -> str:
-        # Валидатор для проверки формата даты и времени (ISO 8601).
-        try:
-            return validate_iso8601_datetime_string(value)
-        except ValueError:
-            raise ValueError(
-                "Некорректный формат даты и времени. Ожидается формат ISO 8601."
-            )
+        return validate_iso8601_datetime_string(value)
 
 
 class UserForbiddenResponse(BaseModel):

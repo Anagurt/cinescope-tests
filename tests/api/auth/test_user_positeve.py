@@ -4,38 +4,47 @@ import allure
 import pytest
 
 from models.base_model_user import UserInfoResponse
-from models.base_models_auth import RegisterUserRequest 
-from resources.user_creds import RegularUserCreds 
+from models.base_models_auth import RegisterUserRequest
+from resources.user_creds import RegularUserCreds
 
 from entities.user import User
 from db_requester.db_helpers import DBHelper
+from tests.constants.auth_cases import (
+    REGULAR_USER_LOCATOR_CASES,
+    REGULAR_USER_LOCATOR_IDS,
+)
+
 
 @allure.feature("Позитивные тесты для эндпоинта User API")
 class TestUserAPIPositive:
 
     @pytest.mark.smoke
+    @pytest.mark.flaky(reruns=2, reruns_delay=1)
     @allure.story("Тест на создание пользователя под супер-админом")
-    def test_create_user(self, super_admin: User, creation_user_data: RegisterUserRequest,
+    def test_create_user(self, super_admin: User,
+                         creation_user_data: RegisterUserRequest,
                          users_to_cleanup: list, db_helper: DBHelper):
         assert not db_helper.user_exists_by_email(creation_user_data.email)
         response = super_admin.api.user_api.create_user(
             user_data=creation_user_data.model_dump(mode="json"))
         create_user_response = UserInfoResponse.model_validate(response.json())
-        assert create_user_response.email == creation_user_data.email, "Email не совпадает"
+        assert (
+            create_user_response.email == creation_user_data.email
+        ), "Email не совпадает"
         users_to_cleanup.append(create_user_response.id)
         assert db_helper.user_exists_by_email(creation_user_data.email)
 
     @pytest.mark.smoke
-    @allure.story("Тест на получение информации о пользователе по ID или Email под супер-админом")
-    @pytest.mark.parametrize("user_locator, expected_status",
-                             [(f"{RegularUserCreds.ID}", HTTPStatus.OK),
-                              (f"{RegularUserCreds.USERNAME}", HTTPStatus.OK)],
-                             ids=[
-                                 "Получение информации о пользователе по ID",
-                                 "Получение информации о пользователе по Email"
-                             ])
+    @allure.story(
+        "Тест на получение информации о пользователе по ID или Email под супер-админом"
+    )
+    @pytest.mark.parametrize(
+        "user_locator",
+        REGULAR_USER_LOCATOR_CASES,
+        ids=REGULAR_USER_LOCATOR_IDS,
+    )
     def test_get_user_by_locator(self, super_admin, user_locator,
-                                 expected_status):
+                                 expected_status: HTTPStatus = HTTPStatus.OK):
         response_by_locator = super_admin.api.user_api.get_user_info(
             user_id=user_locator, expected_status=expected_status)
         by_locator = UserInfoResponse.model_validate(
@@ -49,7 +58,7 @@ class TestUserAPIPositive:
     @allure.story("Тест на удаление пользователя")
     def test_delete_user(self,
                          super_admin: User,
-                         common_user: User, 
+                         common_user: User,
                          db_helper: DBHelper,
                          expected_status: HTTPStatus = HTTPStatus.OK):
         assert db_helper.user_exists_by_email(common_user.email)

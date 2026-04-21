@@ -1,11 +1,9 @@
 from http import HTTPStatus
-from typing import List, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator
 
 from entities.location import Location
 from utils.iso_datetime import validate_iso8601_datetime_string
-
 
 
 class MovieInfoRequest(BaseModel):
@@ -33,7 +31,7 @@ class MovieInfoResponse(BaseModel):
     name: str
     description: str
     genreId: int
-    imageUrl: Optional[str] = None
+    imageUrl: str | None = None
     price: int
     rating: float
     location: Location
@@ -44,19 +42,14 @@ class MovieInfoResponse(BaseModel):
 
     @field_validator("createdAt")
     def validate_created_at(cls, value: str) -> str:
-        try:
-            return validate_iso8601_datetime_string(value)
-        except ValueError:
-            raise ValueError(
-                "Некорректный формат даты и времени. Ожидается формат ISO 8601."
-            )
+        return validate_iso8601_datetime_string(value)
 
 
 class GetMoviesListResponse(BaseModel):
     """
     Ответ GET /movies
     """
-    movies: List[MovieInfoResponse]
+    movies: list[MovieInfoResponse]
     count: int
     page: int
     pageSize: int
@@ -82,35 +75,34 @@ class MovieReviewItem(BaseModel):
     user: MovieReviewUserPayload
 
     @field_validator("createdAt")
-    def validate_review_created_at(cls, value: str) -> str:
-        try:
-            return validate_iso8601_datetime_string(value)
-        except ValueError:
-            raise ValueError(
-                "Некорректный формат даты и времени. Ожидается формат ISO 8601."
-            )
+    def validate_created_at(cls, value: str) -> str:
+        return validate_iso8601_datetime_string(value)
+
 
 class GetMovieByIdResponse(MovieInfoResponse):
     """
     Ответ GET /movies/{id}
     """
-    reviews: List[MovieReviewItem]
+    reviews: list[MovieReviewItem]
 
 
 class GetMovieBadRequest(BaseModel):
-    message: Union[str, List[str]]
+    message: str | list[str]
     error: str = "Bad Request"
-    statusCode: int =HTTPStatus.BAD_REQUEST
-    
+    statusCode: int = HTTPStatus.BAD_REQUEST
+
+
 class GetMovieNotFoundResponse(BaseModel):
     message: str = "Фильм не найден"
     error: str = "Not Found"
     statusCode: int = HTTPStatus.NOT_FOUND
 
+
 class GetMovieForbiddenResponse(BaseModel):
     message: str = "Forbidden resource"
     error: str = "Forbidden"
     statusCode: int = HTTPStatus.FORBIDDEN
+
 
 class GetMovieConflictResponse(BaseModel):
     message: str = "Фильм с таким названием уже существует"

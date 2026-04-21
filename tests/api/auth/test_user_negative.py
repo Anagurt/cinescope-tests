@@ -7,6 +7,12 @@ from models.base_model_user import UserForbiddenResponse, UserNotFoundResponse
 
 from entities.user import User
 from db_requester.db_helpers import DBHelper
+from constants import CommonConstants
+from tests.constants.auth_cases import (
+    INVALID_USER_LOCATOR_CASES,
+    INVALID_USER_LOCATOR_IDS
+)
+
 
 @allure.feature("Негативные тесты для эндпоинта User API")
 class TestUserAPINegative:
@@ -35,15 +41,12 @@ class TestUserAPINegative:
         "Тест на получение информации о несуществующем пользователе под супер-админом"
     )
     @pytest.mark.parametrize(
-        "user_locator, expected_status",
-        [("non_existent_id", HTTPStatus.NOT_FOUND),
-         ("non_existent_email", HTTPStatus.NOT_FOUND)],
-        ids=[
-            "Получение информации по ID",
-            "Получение информации по Email"
-        ])
+        "user_locator",
+        INVALID_USER_LOCATOR_CASES,
+        ids=INVALID_USER_LOCATOR_IDS,
+    )
     def test_get_user_by_locator(self, super_admin, user_locator,
-                                 expected_status):
+                                 expected_status: HTTPStatus = HTTPStatus.NOT_FOUND):
         response = super_admin.api.user_api.get_user_info(
             user_id=user_locator, expected_status=expected_status)
         not_found_response = UserNotFoundResponse.model_validate(
@@ -76,9 +79,10 @@ class TestUserAPINegative:
             super_admin,
             db_helper: DBHelper,
             expected_status: HTTPStatus = HTTPStatus.NOT_FOUND):
-        assert db_helper.get_user_by_id("00000000-0000-0000-0000-000000000000") is None
+        assert db_helper.get_user_by_id(
+            CommonConstants.NON_EXISTENT_USER_ID) is None
         response = super_admin.api.user_api.delete_user(
-            "00000000-0000-0000-0000-000000000000",
+            CommonConstants.NON_EXISTENT_USER_ID,
             expected_status=expected_status)
         not_found_response = UserNotFoundResponse.model_validate(
             response.json())

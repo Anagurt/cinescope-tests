@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from http import HTTPStatus
 
-from requests import Session
+from requests import Session, Response
 
 from constants import (
     BASE_AUTH_URL,
@@ -18,12 +18,13 @@ class AuthAPI(CustomRequester):
     Класс для работы с аутентификацией.
     """
 
-    def __init__(self, session: Session):
+    def __init__(self, session: Session) -> None:
         super().__init__(session=session, base_url=BASE_AUTH_URL)
 
-    def register_user(self,
-                      user_data: dict,
-                      expected_status: HTTPStatus = HTTPStatus.CREATED):
+    def register_user(
+            self,
+            user_data: dict,
+            expected_status: HTTPStatus = HTTPStatus.CREATED) -> Response:
         """
         Регистрация нового пользователя.
         :param user_data: Данные пользователя.
@@ -38,7 +39,7 @@ class AuthAPI(CustomRequester):
 
     def login_user(self,
                    login_data: dict,
-                   expected_status: HTTPStatus = HTTPStatus.OK):
+                   expected_status: HTTPStatus = HTTPStatus.OK) -> Response:
         """
         Авторизация пользователя.
         :param login_data: Данные для логина.
