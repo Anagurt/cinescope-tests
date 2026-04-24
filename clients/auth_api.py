@@ -26,17 +26,18 @@ class AuthAPI(CustomRequester):
             self,
             user_data: dict,
             expected_status: HTTPStatus = HTTPStatus.CREATED,
-            response_model: type[BaseModel] | None = None,
+            success_response_model: type[BaseModel] | None = None,
+            error_response_model: type[BaseModel] | None = None,
             attach_error_messages: bool = False,
             allure_attachment_name: str = "Сообщения об ошибках API",
     ) -> Response:
         """
         Регистрация нового пользователя.
         :param user_data: Данные пользователя.
-            endpoint=REGISTER_ENDPOINT,
             data=user_data,
             expected_status=expected_status,
-            response_model=response_model,
+            success_response_model=success_response_model,
+            error_response_model=error_response_model,
             attach_error_messages=attach_error_messages,
             allure_attachment_name=allure_attachment_name,
 
@@ -46,24 +47,39 @@ class AuthAPI(CustomRequester):
             endpoint=REGISTER_ENDPOINT,
             data=user_data,
             expected_status=expected_status,
-            response_model=response_model,
+            success_response_model=success_response_model,
+            error_response_model=error_response_model,
             attach_error_messages=attach_error_messages,
             allure_attachment_name=allure_attachment_name,
         )
 
-    def login_user(self,
-                   login_data: dict,
-                   expected_status: HTTPStatus = HTTPStatus.OK) -> Response:
+    def login_user(
+            self, 
+            login_data: dict,
+            expected_status: HTTPStatus = HTTPStatus.OK,
+            success_response_model: type[BaseModel] | None = None,
+            error_response_model: type[BaseModel] | None = None,
+            attach_error_messages: bool = False,
+            allure_attachment_name: str = "Сообщения об ошибках API",
+        ) -> Response:
         """
         Авторизация пользователя.
         :param login_data: Данные для логина.
         :param expected_status: Ожидаемый статус-код.
+        :param success_response_model: Pydantic-модель для валидации успешного ответа.
+        :param error_response_model: Pydantic-модель для валидации ошибочного ответа.
+        :param attach_error_messages: Прикрепить поле message в Allure.
+        :param allure_attachment_name: Название вложения в Allure.
         """
         return self.send_request(
             method="POST",
             endpoint=LOGIN_ENDPOINT,
             data=login_data,
             expected_status=expected_status,
+            success_response_model=success_response_model,
+            error_response_model=error_response_model,
+            attach_error_messages=attach_error_messages,
+            allure_attachment_name=allure_attachment_name,
         )
 
     def authenticate(
@@ -82,8 +98,13 @@ class AuthAPI(CustomRequester):
             email, password = RegularUserCreds.USERNAME, RegularUserCreds.PASSWORD
         else:
             email, password = user_creds
+
         login_data = {"email": email, "password": password}
-        response = self.login_user(login_data).json()
+        response = self.login_user(
+            login_data,
+            expected_status=HTTPStatus.OK,
+            success_response_model=None,
+        ).json()
 
         if (token := response.get("accessToken")) is None:
             raise KeyError("token is missing")

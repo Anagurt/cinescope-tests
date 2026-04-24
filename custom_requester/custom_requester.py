@@ -42,6 +42,8 @@ class CustomRequester:
         response_model: type[BaseModel] | None = None,
         attach_error_messages: bool = False,
         allure_attachment_name: str = "Сообщения об ошибках API",
+        success_response_model: type[BaseModel] | None = None,
+        error_response_model: type[BaseModel] | None = None,
     ) -> requests.Response:
         """
         Универсальный метод для отправки запросов.
@@ -54,6 +56,8 @@ class CustomRequester:
         :param response_model: Pydantic-модель для валидации JSON-ответа.
         :param attach_error_messages: Прикрепить поле message в Allure.
         :param allure_attachment_name: Название вложения в Allure.
+        :param success_response_model: Pydantic-модель для валидации успешного ответа.
+        :param error_response_model: Pydantic-модель для валидации ошибочного ответа.
         :return: Объект ответа requests.Response.
         """
         url = f"{self.base_url}{endpoint}"
@@ -66,6 +70,7 @@ class CustomRequester:
                                         params=params)
         if need_logging:
             self.log_request_and_response(response)
+
         if (expected_status is not None
                 and response.status_code != expected_status):
             raise ValueError(
@@ -74,8 +79,19 @@ class CustomRequester:
             )
         validated_response = None
         if response_model is not None:
-            validated_response = response_model.model_validate(response.json())
+            success_response_model = success_response_model or response_model
+            error_response_model = error_response_model or response_model
+            
+        model_to_validate = None
+        if 200 <= response.status_code < 300:
+            model_to_validate = success_response_model
+        elif 400 <= response.status_code < 600:
+            model_to_validate = error_response_model
+
+        if model_to_validate is not None:
+            validated_response = model_to_validate.model_validate(response.json())
             setattr(response, "validated_response", validated_response)
+
         if attach_error_messages:
             self._attach_error_messages(
                 response=response,

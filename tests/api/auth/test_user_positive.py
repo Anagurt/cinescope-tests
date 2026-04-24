@@ -24,22 +24,14 @@ class TestUserAPIPositive:
     def test_create_user(self, super_admin: User,
                          creation_user_data: RegisterUserRequest,
                          users_to_cleanup: list, db_helper: DBHelper):
-        # assert not db_helper.user_exists_by_email(creation_user_data.email)
-        if db_helper.user_exists_by_email(creation_user_data.email):
-            raise AssertionError(
-                f"Пользователь {creation_user_data.email} уже существует в БД, "
-                "ожидался незарегистрированный пользователь"
-            )
         response = super_admin.api.user_api.create_user(
-            user_data=creation_user_data.model_dump(mode="json"))
-        create_user_response = UserInfoResponse.model_validate(response.json())
+            user_data=creation_user_data.model_dump(mode="json",), success_response_model=UserInfoResponse)
 
-        users_to_cleanup.append(create_user_response.id)
+        users_to_cleanup.append(response.validated_response.id)
 
         assert (
-            create_user_response.email == creation_user_data.email
+            response.validated_response.email == creation_user_data.email
         ), "Email не совпадает"
-        # assert db_helper.user_exists_by_email(creation_user_data.email)
         if not db_helper.user_exists_by_email(creation_user_data.email):
             raise AssertionError(
                 f"Пользователь {creation_user_data.email} не существует в БД, "
@@ -58,12 +50,10 @@ class TestUserAPIPositive:
     def test_get_user_by_locator(self, super_admin, user_locator,
                                  expected_status: HTTPStatus = HTTPStatus.OK):
         response_by_locator = super_admin.api.user_api.get_user_info(
-            user_id=user_locator, expected_status=expected_status)
-        by_locator = UserInfoResponse.model_validate(
-            response_by_locator.json())
+            user_id=user_locator, expected_status=expected_status, success_response_model=UserInfoResponse)
 
-        assert by_locator.id == RegularUserCreds.ID, "ID не совпадает"
-        assert by_locator.email == RegularUserCreds.USERNAME, "Email не совпадает"
+        assert response_by_locator.validated_response.id == RegularUserCreds.ID, "ID не совпадает"
+        assert response_by_locator.validated_response.email == RegularUserCreds.USERNAME, "Email не совпадает"
 
     @pytest.mark.smoke
     @pytest.mark.xfail(
@@ -74,18 +64,10 @@ class TestUserAPIPositive:
                          common_user: User,
                          db_helper: DBHelper,
                          expected_status: HTTPStatus = HTTPStatus.OK):
-        # assert db_helper.user_exists_by_email(common_user.email)
-        if not db_helper.user_exists_by_email(common_user.email):
-            raise AssertionError(
-                f"Пользователь {common_user.email} не существует в БД"
-            )
-
         response = super_admin.api.user_api.delete_user(
-            common_user.id, expected_status=expected_status)
-        delete_response = UserInfoResponse.model_validate(response.json())
+            common_user.id, expected_status=expected_status, success_response_model=UserInfoResponse)
 
-        assert delete_response.id == common_user.id, "ID не совпадает"
-        # assert not db_helper.user_exists_by_email(common_user.email)
+        assert response.validated_response.id == common_user.id, "ID не совпадает"
         if db_helper.user_exists_by_email(common_user.email):
             raise AssertionError(
                 f"Пользователь {common_user.email} существует в БД, "
@@ -100,7 +82,6 @@ class TestUserAPIPositive:
             common_user: User,
             db_helper: DBHelper,
             expected_status: HTTPStatus = HTTPStatus.OK):
-        # assert db_helper.user_exists_by_email(common_user.email)
         if not db_helper.user_exists_by_email(common_user.email):
             raise AssertionError(
                 f"Пользователь {common_user.email} не существует в БД"
@@ -110,7 +91,6 @@ class TestUserAPIPositive:
 
         assert response.text.strip(
         ) == "", "Ожидалось пустое тело ответа после удаления"
-        # assert not db_helper.user_exists_by_email(common_user.email)
         if db_helper.user_exists_by_email(common_user.email):
             raise AssertionError(
                 f"Пользователь {common_user.email} существует в БД, "

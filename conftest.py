@@ -106,7 +106,7 @@ def creation_user_data(test_user: RegisterUserRequest) -> RegisterUserRequest:
     updated_data = test_user.model_dump(mode="json")
     updated_data.update({"verified": True, "banned": False})
     return RegisterUserRequest.model_validate(updated_data)
-
+# ______________
 
 @pytest.fixture
 def common_user(
@@ -202,10 +202,10 @@ def created_movie_and_cleanup(
     super_admin.api.auth_api.authenticate()
 
     response = super_admin.api.movies_api.post_movie(
-        movie_data, expected_status=HTTPStatus.CREATED)
-    response_data = response.json()
+        movie_data, expected_status=HTTPStatus.CREATED,
+        success_response_model=MovieInfoResponse)
 
-    created = MovieInfoResponse.model_validate(response_data)
+    created = response.validated_response
 
     yield created
 

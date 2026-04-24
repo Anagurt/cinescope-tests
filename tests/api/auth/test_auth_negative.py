@@ -55,7 +55,7 @@ class TestAuthAPINegative:
         api_manager.auth_api.register_user(
             user_data=register_data,
             expected_status=expected_status,
-            response_model=RegisterUserBadRequestResponse,
+            error_response_model=RegisterUserBadRequestResponse,
             attach_error_messages=True,
         )
         if db_helper.user_exists_by_email(email):
@@ -63,7 +63,7 @@ class TestAuthAPINegative:
                 f"Пользователь {email} зарегистрирован в БД, "
                 "ожидалось, что пользователь не сможет зарегистрироваться"
             )
-        # assert not db_helper.user_exists_by_email(email)
+
 
     @pytest.mark.smoke
     @pytest.mark.negative
@@ -95,16 +95,13 @@ class TestAuthAPINegative:
                 f"Пользователь {email} не существует в БД, "
                 "ожидался существующий пользователь"
             )
-        # assert db_helper.user_exists_by_email(email)
+
         response = api_manager.auth_api.register_user(
-            user_data=register_data, expected_status=expected_status)
-        register_user_response = RegisterUserConflictResponse.model_validate(
-            response.json())
-        assert register_user_response.message == (
+            user_data=register_data, expected_status=expected_status, error_response_model=RegisterUserConflictResponse)
+        
+        assert response.validated_response.message == (
             "Пользователь с таким email уже зарегистрирован"
         ), "Сообщение об ошибке не совпадает с ожидаемым"
-
-        # assert db_helper.user_count_by_email(email) == 1
         if db_helper.user_count_by_email(email) != 1:
             raise AssertionError(
                 f"Пользователь {email} должен быть зарегистрирован в БД, "
@@ -139,10 +136,10 @@ class TestAuthAPINegative:
         api_manager.auth_api.register_user(
             user_data=register_data,
             expected_status=expected_status,
-            response_model=RegisterUserBadRequestResponse,
+            error_response_model=RegisterUserBadRequestResponse,
             attach_error_messages=True,
         )
-        # assert not db_helper.user_exists_by_email(email)
+        
         if db_helper.user_exists_by_email(email):
             raise AssertionError(
                 f"После неуспешной регистрации пользователь {email} "
@@ -167,11 +164,9 @@ class TestAuthAPINegative:
         login_data = {"email": test_user.email, "password": test_user.password}
 
         response = api_manager.auth_api.login_user(
-            login_data=login_data, expected_status=expected_status)
-        login_user_response = LoginUserUnauthorizedResponse.model_validate(
-            response.json())
+            login_data=login_data, expected_status=expected_status, error_response_model=LoginUserUnauthorizedResponse)
 
-        assert login_user_response.message == (
+        assert response.validated_response.message == (
             "Неверный логин или пароль"
         ), "Сообщение об ошибке не совпадает с ожидаемым"
         if db_helper.user_exists_by_email(test_user.email):
@@ -199,10 +194,8 @@ class TestAuthAPINegative:
         login_data = {"email": email, "password": password}
 
         response = api_manager.auth_api.login_user(
-            login_data=login_data, expected_status=expected_status)
-        login_user_response = LoginUserUnauthorizedResponse.model_validate(
-            response.json())
+            login_data=login_data, expected_status=expected_status, error_response_model=LoginUserUnauthorizedResponse)
 
-        assert login_user_response.message == (
+        assert response.validated_response.message == (
             "Неверный логин или пароль"
         ), "Сообщение об ошибке не совпадает с ожидаемым"

@@ -26,21 +26,17 @@ class TestAuthAPIPositive:
     def test_register_user(self, api_manager: ApiManager,
                            test_user: RegisterUserRequest,
                            users_to_cleanup: list, db_helper: DBHelper):
-        # assert not db_helper.user_exists_by_email(test_user.email)
         if db_helper.user_exists_by_email(test_user.email):
             raise AssertionError(
                 f"Пользователь {test_user.email} уже существует в БД, "
                 "ожидался незарегистрированный пользователь"
             )
         response = api_manager.auth_api.register_user(
-            user_data=test_user.model_dump(mode="json"))
-        register_user_response = RegisterUserResponse.model_validate(
-            response.json())
+            user_data=test_user.model_dump(mode="json"), success_response_model=RegisterUserResponse)
 
-        users_to_cleanup.append(register_user_response.id)
+        users_to_cleanup.append(response.validated_response.id)
 
-        assert register_user_response.email == test_user.email, "Email не совпадает"
-        # assert db_helper.user_exists_by_email(test_user.email)
+        assert response.validated_response.email == test_user.email, "Email не совпадает"
         if not db_helper.user_exists_by_email(test_user.email):
             raise AssertionError(
                 f"После успешной регистрации пользователь {test_user.email} "
@@ -70,7 +66,6 @@ class TestAuthAPIPositive:
             )
 
         response = api_manager.auth_api.login_user(
-            login_data=login_data, expected_status=expected_status)
-        body = LoginResponse.model_validate(response.json())
+            login_data=login_data, expected_status=expected_status, success_response_model=LoginResponse)
 
-        assert body.user.email == login_data["email"], "Email не совпадает"
+        assert response.validated_response.user.email == login_data["email"], "Email не совпадает"
