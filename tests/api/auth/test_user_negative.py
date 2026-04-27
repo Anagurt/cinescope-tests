@@ -3,8 +3,6 @@ from http import HTTPStatus
 import allure
 import pytest
 
-from models.base_model_user import UserForbiddenResponse, UserNotFoundResponse
-
 from entities.user import User
 from db_requester.db_helpers import DBHelper
 from constants import CommonConstants
@@ -26,9 +24,9 @@ class TestUserAPINegative:
             self,
             common_user: User,
             db_helper: DBHelper,
-            expected_status: HTTPStatus = HTTPStatus.FORBIDDEN):
+        ):
         response = common_user.api.user_api.get_user_info(
-            user_id=common_user.id, expected_status=expected_status, error_response_model=UserForbiddenResponse)
+            user_id=common_user.id, expected_status=HTTPStatus.FORBIDDEN)
 
         assert response.validated_response.message == (
             "Forbidden resource"
@@ -46,9 +44,9 @@ class TestUserAPINegative:
         ids=INVALID_USER_LOCATOR_IDS,
     )
     def test_get_user_by_locator(self, super_admin, user_locator,
-                                 expected_status: HTTPStatus = HTTPStatus.NOT_FOUND):
+        ):
         response = super_admin.api.user_api.get_user_info(
-            user_id=user_locator, expected_status=expected_status, error_response_model=UserNotFoundResponse)
+            user_id=user_locator, expected_status=HTTPStatus.NOT_FOUND)
 
         assert response.validated_response.message == (
             "Not Found"
@@ -62,9 +60,9 @@ class TestUserAPINegative:
             regular_user: User,
             common_user: User,
             db_helper: DBHelper,
-            expected_status: HTTPStatus = HTTPStatus.FORBIDDEN):
+        ):
         response = regular_user.api.user_api.delete_user(
-            common_user.id, expected_status=expected_status, error_response_model=UserForbiddenResponse)
+            common_user.id, expected_status=HTTPStatus.FORBIDDEN)
 
         assert response.validated_response.message == (
             "Forbidden"
@@ -83,10 +81,10 @@ class TestUserAPINegative:
             self,
             super_admin,
             db_helper: DBHelper,
-            expected_status: HTTPStatus = HTTPStatus.NOT_FOUND):
+        ):
         response = super_admin.api.user_api.delete_user(
             CommonConstants.NON_EXISTENT_USER_ID,
-            expected_status=expected_status, error_response_model=UserNotFoundResponse)
+            expected_status=HTTPStatus.NOT_FOUND)
 
         assert response.validated_response.message == (
             "Not Found"

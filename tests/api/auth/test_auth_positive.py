@@ -5,10 +5,8 @@ import pytest
 
 from clients.api_manager import ApiManager
 from models.base_models_auth import (
-    LoginResponse,
     RegisterUserRequest,
     LoginUserRequest,
-    RegisterUserResponse,
 )
 
 from db_requester.db_helpers import DBHelper
@@ -26,18 +24,18 @@ class TestAuthAPIPositive:
     def test_register_user(self, api_manager: ApiManager,
                            test_user: RegisterUserRequest,
                            users_to_cleanup: list, db_helper: DBHelper):
-        if db_helper.user_exists_by_email(test_user.email):
+        if db_helper.user_exists_by_email(str(test_user.email)):
             raise AssertionError(
                 f"Пользователь {test_user.email} уже существует в БД, "
                 "ожидался незарегистрированный пользователь"
             )
         response = api_manager.auth_api.register_user(
-            user_data=test_user.model_dump(mode="json"), success_response_model=RegisterUserResponse)
+            user_data=test_user.model_dump(mode="json"))
 
         users_to_cleanup.append(response.validated_response.id)
 
         assert response.validated_response.email == test_user.email, "Email не совпадает"
-        if not db_helper.user_exists_by_email(test_user.email):
+        if not db_helper.user_exists_by_email(str(test_user.email)):
             raise AssertionError(
                 f"После успешной регистрации пользователь {test_user.email} "
                 "должен появиться в БД"
@@ -56,7 +54,6 @@ class TestAuthAPIPositive:
             email: str,
             password: str,
             db_helper: DBHelper,
-            expected_status: HTTPStatus = HTTPStatus.OK,
     ):
         login_payload = LoginUserRequest(email=email, password=password)
         login_data = login_payload.model_dump(mode="json")
@@ -66,6 +63,6 @@ class TestAuthAPIPositive:
             )
 
         response = api_manager.auth_api.login_user(
-            login_data=login_data, expected_status=expected_status, success_response_model=LoginResponse)
+            login_data=login_data, expected_status=HTTPStatus.OK)
 
         assert response.validated_response.user.email == login_data["email"], "Email не совпадает"

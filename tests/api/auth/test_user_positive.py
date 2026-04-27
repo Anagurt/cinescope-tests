@@ -3,7 +3,6 @@ from http import HTTPStatus
 import allure
 import pytest
 
-from models.base_model_user import UserInfoResponse
 from models.base_models_auth import RegisterUserRequest
 from resources.user_creds import RegularUserCreds
 
@@ -25,14 +24,14 @@ class TestUserAPIPositive:
                          creation_user_data: RegisterUserRequest,
                          users_to_cleanup: list, db_helper: DBHelper):
         response = super_admin.api.user_api.create_user(
-            user_data=creation_user_data.model_dump(mode="json",), success_response_model=UserInfoResponse)
+            user_data=creation_user_data.model_dump(mode="json"), expected_status=HTTPStatus.CREATED)
 
         users_to_cleanup.append(response.validated_response.id)
 
         assert (
             response.validated_response.email == creation_user_data.email
         ), "Email не совпадает"
-        if not db_helper.user_exists_by_email(creation_user_data.email):
+        if not db_helper.user_exists_by_email(str(creation_user_data.email)):
             raise AssertionError(
                 f"Пользователь {creation_user_data.email} не существует в БД, "
                 "ожидалось, что пользователь будет создан в БД"
@@ -47,10 +46,9 @@ class TestUserAPIPositive:
         REGULAR_USER_LOCATOR_CASES,
         ids=REGULAR_USER_LOCATOR_IDS,
     )
-    def test_get_user_by_locator(self, super_admin, user_locator,
-                                 expected_status: HTTPStatus = HTTPStatus.OK):
+    def test_get_user_by_locator(self, super_admin, user_locator):
         response_by_locator = super_admin.api.user_api.get_user_info(
-            user_id=user_locator, expected_status=expected_status, success_response_model=UserInfoResponse)
+            user_id=user_locator, expected_status=HTTPStatus.OK)
 
         assert response_by_locator.validated_response.id == RegularUserCreds.ID, "ID не совпадает"
         assert response_by_locator.validated_response.email == RegularUserCreds.USERNAME, "Email не совпадает"
@@ -63,9 +61,9 @@ class TestUserAPIPositive:
                          super_admin: User,
                          common_user: User,
                          db_helper: DBHelper,
-                         expected_status: HTTPStatus = HTTPStatus.OK):
+        ):
         response = super_admin.api.user_api.delete_user(
-            common_user.id, expected_status=expected_status, success_response_model=UserInfoResponse)
+            common_user.id, expected_status=HTTPStatus.OK)
 
         assert response.validated_response.id == common_user.id, "ID не совпадает"
         if db_helper.user_exists_by_email(common_user.email):
@@ -81,13 +79,13 @@ class TestUserAPIPositive:
             super_admin: User,
             common_user: User,
             db_helper: DBHelper,
-            expected_status: HTTPStatus = HTTPStatus.OK):
+        ):
         if not db_helper.user_exists_by_email(common_user.email):
             raise AssertionError(
                 f"Пользователь {common_user.email} не существует в БД"
             )
         response = super_admin.api.user_api.delete_user(
-            common_user.id, expected_status=expected_status)
+            common_user.id, expected_status=HTTPStatus.OK)
 
         assert response.text.strip(
         ) == "", "Ожидалось пустое тело ответа после удаления"

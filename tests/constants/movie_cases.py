@@ -48,13 +48,11 @@ INVALID_MOVIE_FIELDS_IDS = [
 MOVIE_METHODS_CASES = [
     MovieMethods.GET,
     MovieMethods.DELETE,
-    MovieMethods.PATCH
 ]
 
 MOVIE_METHODS_IDS = [
     "GET несуществующего фильма",
     "DELETE несуществующего фильма",
-    "PATCH несуществующего фильма",
 ]
 
 ADMIN_AND_REGULAR_USER_CASES = [

@@ -12,7 +12,13 @@ from constants import (
 )
 from custom_requester.custom_requester import CustomRequester
 from resources.user_creds import RegularUserCreds, SuperAdminCreds
-
+from models.base_models_auth import (
+    LoginResponse,
+    LoginUserUnauthorizedResponse,
+    RegisterUserBadRequestResponse,
+    RegisterUserConflictResponse,
+    RegisterUserResponse,
+)
 
 class AuthAPI(CustomRequester):
     """
@@ -22,12 +28,18 @@ class AuthAPI(CustomRequester):
     def __init__(self, session: Session) -> None:
         super().__init__(session=session, base_url=BASE_AUTH_URL)
 
+    @staticmethod
+    def _resolve_error_model(
+        expected_status: HTTPStatus,
+        status_to_model: dict[HTTPStatus, type[BaseModel]],
+    ) -> type[BaseModel] | None:
+        return status_to_model.get(expected_status)
+
+
     def register_user(
             self,
             user_data: dict,
             expected_status: HTTPStatus = HTTPStatus.CREATED,
-            success_response_model: type[BaseModel] | None = None,
-            error_response_model: type[BaseModel] | None = None,
             attach_error_messages: bool = False,
             allure_attachment_name: str = "Сообщения об ошибках API",
     ) -> Response:
@@ -36,8 +48,6 @@ class AuthAPI(CustomRequester):
         :param user_data: Данные пользователя.
             data=user_data,
             expected_status=expected_status,
-            success_response_model=success_response_model,
-            error_response_model=error_response_model,
             attach_error_messages=attach_error_messages,
             allure_attachment_name=allure_attachment_name,
 
@@ -47,8 +57,14 @@ class AuthAPI(CustomRequester):
             endpoint=REGISTER_ENDPOINT,
             data=user_data,
             expected_status=expected_status,
-            success_response_model=success_response_model,
-            error_response_model=error_response_model,
+            success_response_model=RegisterUserResponse,
+            error_response_model=self._resolve_error_model(
+                expected_status,
+                {
+                    HTTPStatus.BAD_REQUEST: RegisterUserBadRequestResponse,
+                    HTTPStatus.CONFLICT: RegisterUserConflictResponse,
+                },
+            ),
             attach_error_messages=attach_error_messages,
             allure_attachment_name=allure_attachment_name,
         )
@@ -57,8 +73,6 @@ class AuthAPI(CustomRequester):
             self, 
             login_data: dict,
             expected_status: HTTPStatus = HTTPStatus.OK,
-            success_response_model: type[BaseModel] | None = None,
-            error_response_model: type[BaseModel] | None = None,
             attach_error_messages: bool = False,
             allure_attachment_name: str = "Сообщения об ошибках API",
         ) -> Response:
@@ -66,8 +80,6 @@ class AuthAPI(CustomRequester):
         Авторизация пользователя.
         :param login_data: Данные для логина.
         :param expected_status: Ожидаемый статус-код.
-        :param success_response_model: Pydantic-модель для валидации успешного ответа.
-        :param error_response_model: Pydantic-модель для валидации ошибочного ответа.
         :param attach_error_messages: Прикрепить поле message в Allure.
         :param allure_attachment_name: Название вложения в Allure.
         """
@@ -76,8 +88,13 @@ class AuthAPI(CustomRequester):
             endpoint=LOGIN_ENDPOINT,
             data=login_data,
             expected_status=expected_status,
-            success_response_model=success_response_model,
-            error_response_model=error_response_model,
+            success_response_model=LoginResponse,
+            error_response_model=self._resolve_error_model(
+                expected_status,
+                {
+                    HTTPStatus.UNAUTHORIZED: LoginUserUnauthorizedResponse,
+                },
+            ),
             attach_error_messages=attach_error_messages,
             allure_attachment_name=allure_attachment_name,
         )
@@ -103,7 +120,6 @@ class AuthAPI(CustomRequester):
         response = self.login_user(
             login_data,
             expected_status=HTTPStatus.OK,
-            success_response_model=None,
         ).json()
 
         if (token := response.get("accessToken")) is None:

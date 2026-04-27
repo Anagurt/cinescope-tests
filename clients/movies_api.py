@@ -5,23 +5,39 @@ from requests import Session, Response
 from constants import BASE_MOVIES_URL, MOVIES_ENDPOINT
 from custom_requester.custom_requester import CustomRequester
 from pydantic import BaseModel
-
+from models.base_model_movies import (
+    GetMovieBadRequest,
+    GetMovieConflictResponse,
+    GetMovieForbiddenResponse,
+    GetMovieNotFoundResponse,
+    GetMovieByIdResponse,
+    GetMoviesListResponse,
+    MovieInfoResponse,
+)
 
 class MoviesAPI(CustomRequester):
     """
     Класс для работы с API фильмов.
     """
+    ERROR_MODELS: dict[HTTPStatus, type[BaseModel]] = {
+        HTTPStatus.BAD_REQUEST: GetMovieBadRequest,
+        HTTPStatus.FORBIDDEN: GetMovieForbiddenResponse,
+        HTTPStatus.NOT_FOUND: GetMovieNotFoundResponse,
+        HTTPStatus.CONFLICT: GetMovieConflictResponse,
+    }
 
     def __init__(self, session: Session) -> None:
         self.session = session
         super().__init__(session=session, base_url=BASE_MOVIES_URL)
 
+    @staticmethod
+    def _resolve_error_model(expected_status: HTTPStatus) -> type[BaseModel] | None:
+        return MoviesAPI.ERROR_MODELS.get(expected_status)
+
     def get_movies(
             self,
             params: dict = None,
             expected_status: HTTPStatus = HTTPStatus.OK,
-            success_response_model: type[BaseModel] | None = None,
-            error_response_model: type[BaseModel] | None = None,
             attach_error_messages: bool = False,
             allure_attachment_name: str = "Сообщения об ошибках API",
         ) -> Response:
@@ -29,8 +45,6 @@ class MoviesAPI(CustomRequester):
         Получение списка афиш фильмов.
         :param params: Параметры запроса.
         :param expected_status: Ожидаемый статус-код.
-        :param success_response_model: Pydantic-модель для валидации успешного ответа.
-        :param error_response_model: Pydantic-модель для валидации ошибочного ответа.
         :param attach_error_messages: Прикрепить поле message в Allure.
         :param allure_attachment_name: Название вложения в Allure.
         """
@@ -39,8 +53,8 @@ class MoviesAPI(CustomRequester):
             endpoint=MOVIES_ENDPOINT,
             params=params,
             expected_status=expected_status,
-            success_response_model=success_response_model,
-            error_response_model=error_response_model,
+            success_response_model=GetMoviesListResponse,
+            error_response_model=self._resolve_error_model(expected_status),
             attach_error_messages=attach_error_messages,
             allure_attachment_name=allure_attachment_name,
         )
@@ -49,8 +63,6 @@ class MoviesAPI(CustomRequester):
             self,
             movie_data: dict,
             expected_status: HTTPStatus = HTTPStatus.CREATED,
-            success_response_model: type[BaseModel] | None = None,
-            error_response_model: type[BaseModel] | None = None,
             attach_error_messages: bool = False,
             allure_attachment_name: str = "Сообщения об ошибках API",
         ) -> Response:
@@ -58,8 +70,6 @@ class MoviesAPI(CustomRequester):
         Создание афиши фильма.
         :param movie_data: Данные афиши фильма.
         :param expected_status: Ожидаемый статус-код.
-        :param success_response_model: Pydantic-модель для валидации успешного ответа.
-        :param error_response_model: Pydantic-модель для валидации ошибочного ответа.
         :param attach_error_messages: Прикрепить поле message в Allure.
         :param allure_attachment_name: Название вложения в Allure.
         """
@@ -68,8 +78,8 @@ class MoviesAPI(CustomRequester):
             endpoint=MOVIES_ENDPOINT,
             data=movie_data,
             expected_status=expected_status,
-            success_response_model=success_response_model,
-            error_response_model=error_response_model,
+            success_response_model=MovieInfoResponse,
+            error_response_model=self._resolve_error_model(expected_status),
             attach_error_messages=attach_error_messages,
             allure_attachment_name=allure_attachment_name,
         )
@@ -78,8 +88,6 @@ class MoviesAPI(CustomRequester):
             self,
             movie_id: int,
             expected_status: HTTPStatus = HTTPStatus.OK,
-            success_response_model: type[BaseModel] | None = None,
-            error_response_model: type[BaseModel] | None = None,
             attach_error_messages: bool = False,
             allure_attachment_name: str = "Сообщения об ошибках API",
         ) -> Response:
@@ -87,8 +95,6 @@ class MoviesAPI(CustomRequester):
         Получение информации о фильме.
         :param movie_id: ID афиши фильма.
         :param expected_status: Ожидаемый статус-код.
-        :param success_response_model: Pydantic-модель для валидации успешного ответа.
-        :param error_response_model: Pydantic-модель для валидации ошибочного ответа.
         :param attach_error_messages: Прикрепить поле message в Allure.
         :param allure_attachment_name: Название вложения в Allure.
         """
@@ -96,8 +102,8 @@ class MoviesAPI(CustomRequester):
             method="GET",
             endpoint=f"{MOVIES_ENDPOINT}/{movie_id}",
             expected_status=expected_status,
-            success_response_model=success_response_model,
-            error_response_model=error_response_model,
+            success_response_model=GetMovieByIdResponse,
+            error_response_model=self._resolve_error_model(expected_status),
             attach_error_messages=attach_error_messages,
             allure_attachment_name=allure_attachment_name,
         )
@@ -107,8 +113,6 @@ class MoviesAPI(CustomRequester):
             movie_id: int,
             change_movie_data: dict,
             expected_status: HTTPStatus = HTTPStatus.OK,
-            success_response_model: type[BaseModel] | None = None,
-            error_response_model: type[BaseModel] | None = None,
             attach_error_messages: bool = False,
             allure_attachment_name: str = "Сообщения об ошибках API",
         ) -> Response:
@@ -117,8 +121,6 @@ class MoviesAPI(CustomRequester):
         :param movie_id: ID афиши фильма.
         :param change_movie_data: Данные для редактирования афиши фильма.
         :param expected_status: Ожидаемый статус-код.
-        :param success_response_model: Pydantic-модель для валидации успешного ответа.
-        :param error_response_model: Pydantic-модель для валидации ошибочного ответа.
         :param attach_error_messages: Прикрепить поле message в Allure.
         :param allure_attachment_name: Название вложения в Allure.
         """
@@ -127,8 +129,8 @@ class MoviesAPI(CustomRequester):
             endpoint=f"{MOVIES_ENDPOINT}/{movie_id}",
             data=change_movie_data,
             expected_status=expected_status,
-            success_response_model=success_response_model,
-            error_response_model=error_response_model,
+            success_response_model=MovieInfoResponse,
+            error_response_model=self._resolve_error_model(expected_status),
             attach_error_messages=attach_error_messages,
             allure_attachment_name=allure_attachment_name,
         )
@@ -137,8 +139,6 @@ class MoviesAPI(CustomRequester):
             self,
             movie_id: int,
             expected_status: HTTPStatus = HTTPStatus.OK,
-            success_response_model: type[BaseModel] | None = None,
-            error_response_model: type[BaseModel] | None = None,
             attach_error_messages: bool = False,
             allure_attachment_name: str = "Сообщения об ошибках API",
         ) -> Response:
@@ -146,8 +146,6 @@ class MoviesAPI(CustomRequester):
         Удаление афиши фильма.
         :param movie_id: ID афиши фильма.
         :param expected_status: Ожидаемый статус-код.
-        :param success_response_model: Pydantic-модель для валидации успешного ответа.
-        :param error_response_model: Pydantic-модель для валидации ошибочного ответа.
         :param attach_error_messages: Прикрепить поле message в Allure.
         :param allure_attachment_name: Название вложения в Allure.
         """
@@ -155,8 +153,8 @@ class MoviesAPI(CustomRequester):
             method="DELETE",
             endpoint=f"{MOVIES_ENDPOINT}/{movie_id}",
             expected_status=expected_status,
-            success_response_model=success_response_model,
-            error_response_model=error_response_model,
+            success_response_model=MovieInfoResponse,
+            error_response_model=self._resolve_error_model(expected_status),
             attach_error_messages=attach_error_messages,
             allure_attachment_name=allure_attachment_name,
         )

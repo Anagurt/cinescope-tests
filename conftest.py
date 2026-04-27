@@ -202,8 +202,7 @@ def created_movie_and_cleanup(
     super_admin.api.auth_api.authenticate()
 
     response = super_admin.api.movies_api.post_movie(
-        movie_data, expected_status=HTTPStatus.CREATED,
-        success_response_model=MovieInfoResponse)
+        movie_data, expected_status=HTTPStatus.CREATED)
 
     created = response.validated_response
 

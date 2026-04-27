@@ -1,15 +1,10 @@
 from http import HTTPStatus
+from http.client import responses
 
 import allure
 import pytest
 
-from models.base_model_movies import (
-    GetMovieBadRequest,
-    GetMovieNotFoundResponse,
-    GetMovieForbiddenResponse,
-    MovieInfoRequest,
-    GetMovieConflictResponse,
-)
+from models.base_model_movies import MovieInfoRequest
 from clients.api_manager import ApiManager
 from db_requester.db_helpers import DBHelper
 from tests.constants.movie_cases import (
@@ -40,10 +35,9 @@ class TestMoviesAPINegative:
         ids=INVALID_GET_MOVIES_PARAMS_IDS,
     )
     def test_movies_with_invalid_params_unauthorized_user(
-            self, anonymous_api_manager, params: dict,
-            expected_status: HTTPStatus = HTTPStatus.BAD_REQUEST):
-        response = anonymous_api_manager.movies_api.get_movies(
-            params=params, expected_status=expected_status, error_response_model=GetMovieBadRequest)
+            self, anonymous_api_manager, params: dict):
+        anonymous_api_manager.movies_api.get_movies(
+            params=params, expected_status=HTTPStatus.BAD_REQUEST)
 
     @pytest.mark.smoke
     @pytest.mark.negative
@@ -56,25 +50,24 @@ class TestMoviesAPINegative:
         ids=MOVIE_METHODS_IDS,
     )
     def test_operation_with_nonexistent_movie_super_admin(
-            self, super_admin, operation: str,
-            db_helper: DBHelper,
-            expected_status: HTTPStatus = HTTPStatus.NOT_FOUND):
+            self, super_admin, operation: str):
         movie_id = 999999999
-        if db_helper.get_movie_by_id(movie_id):
-            raise AssertionError(
-                f"Несуществующий фильм с ID {movie_id} существует в БД"
-            )
-
         method = getattr(super_admin.api.movies_api, operation)
-        if operation == MovieMethods.PATCH:
-            response = method(
-                movie_id,
-                MovieConstants.PATCH_MOVIE_DATA_NEGATIVE_CASES,
-                expected_status=expected_status,
-                error_response_model=GetMovieNotFoundResponse,
-            )
-        else:
-            response = method(movie_id, expected_status=expected_status, error_response_model=GetMovieNotFoundResponse)
+        method(movie_id, expected_status=HTTPStatus.NOT_FOUND)
+
+    @pytest.mark.smoke
+    @pytest.mark.negative
+    @allure.story(
+        "Негативный тест на изменение несуществующего фильма (под супер-админом)"
+    )
+    def test_patch_nonexistent_movie_super_admin(
+            self, super_admin):
+        movie_id = 999999999
+        super_admin.api.movies_api.patch_movie(
+            movie_id,
+            MovieConstants.PATCH_MOVIE_DATA_NEGATIVE_CASES,
+            expected_status=HTTPStatus.NOT_FOUND
+        )
 
     @pytest.mark.smoke
     @pytest.mark.negative
@@ -89,11 +82,9 @@ class TestMoviesAPINegative:
             self,
             super_admin,
             movie_data,
-            db_helper: DBHelper,
-            expected_status: HTTPStatus = HTTPStatus.BAD_REQUEST,
-    ):
-        response = super_admin.api.movies_api.post_movie(
-            movie_data, expected_status=expected_status, error_response_model=GetMovieBadRequest)
+            db_helper: DBHelper):
+        super_admin.api.movies_api.post_movie(
+            movie_data, expected_status=HTTPStatus.BAD_REQUEST)
 
         if db_helper.movie_exists_by_name(movie_data["name"]):
             raise AssertionError(
@@ -118,12 +109,11 @@ class TestMoviesAPINegative:
             email: str,
             password: str,
             movie_data,
-            db_helper: DBHelper,
-            expected_status: HTTPStatus = HTTPStatus.FORBIDDEN,
-    ):
+            db_helper: DBHelper):
+
         api_manager.auth_api.authenticate((email, password))
-        response = api_manager.movies_api.post_movie(
-            movie_data, expected_status=expected_status, error_response_model=GetMovieForbiddenResponse)
+        api_manager.movies_api.post_movie(
+            movie_data, expected_status=HTTPStatus.FORBIDDEN)
 
         if db_helper.movie_exists_by_name(movie_data.name):
             raise AssertionError(
@@ -149,7 +139,6 @@ class TestMoviesAPINegative:
             password: str,
             created_movie_and_cleanup,
             db_helper: DBHelper,
-            expected_status: HTTPStatus = HTTPStatus.FORBIDDEN,
     ):
         if not db_helper.get_movie_by_id(created_movie_and_cleanup.id):
             raise AssertionError(
@@ -157,8 +146,8 @@ class TestMoviesAPINegative:
             )
 
         api_manager.auth_api.authenticate((email, password))
-        response = api_manager.movies_api.delete_movie(
-            created_movie_and_cleanup.id, expected_status=expected_status, error_response_model=GetMovieForbiddenResponse)
+        api_manager.movies_api.delete_movie(
+            created_movie_and_cleanup.id, expected_status=HTTPStatus.FORBIDDEN)
 
         if not db_helper.get_movie_by_id(created_movie_and_cleanup.id):
             raise AssertionError(
@@ -183,7 +172,6 @@ class TestMoviesAPINegative:
             password: str,
             created_movie_and_cleanup,
             db_helper: DBHelper,
-            expected_status: HTTPStatus = HTTPStatus.FORBIDDEN,
     ):
         if not db_helper.get_movie_by_id(created_movie_and_cleanup.id):
             raise AssertionError(
@@ -194,10 +182,10 @@ class TestMoviesAPINegative:
         change_movie_data = MovieInfoRequest(
             **MovieConstants.PATCH_MOVIE_DATA_NEGATIVE_CASES
         )
-        response = api_manager.movies_api.patch_movie(
+        api_manager.movies_api.patch_movie(
             created_movie_and_cleanup.id,
             change_movie_data.model_dump(mode="json"),
-            expected_status=expected_status, error_response_model=GetMovieForbiddenResponse)
+            expected_status=HTTPStatus.FORBIDDEN)
 
         if not db_helper.movie_exists_by_name(created_movie_and_cleanup.name):
             raise AssertionError(
@@ -215,7 +203,6 @@ class TestMoviesAPINegative:
             super_admin,
             created_movie_and_cleanup,
             db_helper: DBHelper,
-            expected_status: HTTPStatus = HTTPStatus.CONFLICT,
         ):
         movie_data = MovieInfoRequest(
             name=created_movie_and_cleanup.name,
@@ -226,8 +213,8 @@ class TestMoviesAPINegative:
             published=created_movie_and_cleanup.published,
             genreId=created_movie_and_cleanup.genreId,
         )
-        response = super_admin.api.movies_api.post_movie(
-            movie_data, expected_status=expected_status, error_response_model=GetMovieConflictResponse)
+        super_admin.api.movies_api.post_movie(
+            movie_data, expected_status=HTTPStatus.CONFLICT)
 
         if db_helper.movie_count_by_name(created_movie_and_cleanup.name) != 1:
             raise AssertionError(
@@ -248,12 +235,11 @@ class TestMoviesAPINegative:
             change_movie_data,
             created_movie_and_cleanup,
             db_helper: DBHelper,
-            expected_status: HTTPStatus = HTTPStatus.BAD_REQUEST,
     ):
-        response = super_admin.api.movies_api.patch_movie(
+        super_admin.api.movies_api.patch_movie(
             created_movie_and_cleanup.id,
             change_movie_data,
-            expected_status=expected_status, error_response_model=GetMovieBadRequest)
+            expected_status=HTTPStatus.BAD_REQUEST)
 
         if db_helper.movie_exists_by_name(change_movie_data["name"]):
             raise AssertionError(

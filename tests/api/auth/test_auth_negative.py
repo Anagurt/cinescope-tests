@@ -3,12 +3,7 @@ from http import HTTPStatus
 import allure
 import pytest
 
-from models.base_models_auth import (
-    RegisterUserRequest,
-    LoginUserUnauthorizedResponse,
-    RegisterUserBadRequestResponse,
-    RegisterUserConflictResponse,
-)
+from models.base_models_auth import RegisterUserRequest
 
 from db_requester.db_helpers import DBHelper
 from clients.api_manager import ApiManager
@@ -44,7 +39,6 @@ class TestAuthAPINegative:
             password_repeat: str,
             api_manager,
             db_helper: DBHelper,
-            expected_status: HTTPStatus = HTTPStatus.BAD_REQUEST
     ):
         register_data = {
             "email": email,
@@ -54,8 +48,7 @@ class TestAuthAPINegative:
         }
         api_manager.auth_api.register_user(
             user_data=register_data,
-            expected_status=expected_status,
-            error_response_model=RegisterUserBadRequestResponse,
+            expected_status=HTTPStatus.BAD_REQUEST,
             attach_error_messages=True,
         )
         if db_helper.user_exists_by_email(email):
@@ -82,7 +75,6 @@ class TestAuthAPINegative:
             password_repeat: str,
             api_manager: ApiManager,
             db_helper: DBHelper,
-            expected_status: HTTPStatus = HTTPStatus.CONFLICT,
     ):
         register_data = {
             "email": email,
@@ -97,7 +89,8 @@ class TestAuthAPINegative:
             )
 
         response = api_manager.auth_api.register_user(
-            user_data=register_data, expected_status=expected_status, error_response_model=RegisterUserConflictResponse)
+            user_data=register_data, expected_status=HTTPStatus.CONFLICT
+        )
         
         assert response.validated_response.message == (
             "Пользователь с таким email уже зарегистрирован"
@@ -125,7 +118,6 @@ class TestAuthAPINegative:
             password_repeat: str,
             api_manager,
             db_helper: DBHelper,
-            expected_status: HTTPStatus = HTTPStatus.BAD_REQUEST
     ):
         register_data = {
             "email": email,
@@ -135,8 +127,7 @@ class TestAuthAPINegative:
         }
         api_manager.auth_api.register_user(
             user_data=register_data,
-            expected_status=expected_status,
-            error_response_model=RegisterUserBadRequestResponse,
+            expected_status=HTTPStatus.BAD_REQUEST,
             attach_error_messages=True,
         )
         
@@ -155,7 +146,7 @@ class TestAuthAPINegative:
             test_user: RegisterUserRequest,
             api_manager: ApiManager,
             db_helper: DBHelper,
-            expected_status: HTTPStatus = HTTPStatus.UNAUTHORIZED):
+        ):
         if db_helper.user_exists_by_email(test_user.email):
             raise AssertionError(
                 f"Пользователь {test_user.email} уже существует в БД, "
@@ -164,7 +155,8 @@ class TestAuthAPINegative:
         login_data = {"email": test_user.email, "password": test_user.password}
 
         response = api_manager.auth_api.login_user(
-            login_data=login_data, expected_status=expected_status, error_response_model=LoginUserUnauthorizedResponse)
+            login_data=login_data, expected_status=HTTPStatus.UNAUTHORIZED
+        )
 
         assert response.validated_response.message == (
             "Неверный логин или пароль"
@@ -189,12 +181,12 @@ class TestAuthAPINegative:
             email,
             password,
             api_manager,
-            expected_status: HTTPStatus = HTTPStatus.UNAUTHORIZED,
     ):
         login_data = {"email": email, "password": password}
 
         response = api_manager.auth_api.login_user(
-            login_data=login_data, expected_status=expected_status, error_response_model=LoginUserUnauthorizedResponse)
+            login_data=login_data, expected_status=HTTPStatus.UNAUTHORIZED
+        )
 
         assert response.validated_response.message == (
             "Неверный логин или пароль"
