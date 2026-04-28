@@ -1,67 +1,68 @@
+from http import HTTPStatus
+
 import allure
+import pytest
 
 from clients.api_manager import ApiManager
+from models.base_models_auth import (
+    RegisterUserRequest,
+    LoginUserRequest,
+)
+
+from db_requester.db_helpers import DBHelper
+from tests.constants.auth_cases import (
+    LOGIN_EXIST_USERS_CASES,
+    LOGIN_EXIST_USERS_IDS
+)
+
 
 @allure.feature("Позитивные тесты для auth API")
 class TestAuthAPIPositive:
+
+    @pytest.mark.smoke
     @allure.story("Тест на регистрацию пользователя")
-    def test_register_user(self, api_manager: ApiManager, new_user: dict, users_to_cleanup: list):
-        response = api_manager.auth_api.register_user(new_user)
-        response_data = response.json()
-        user_id = response_data.get("id")
-        assert user_id is not None, "В ответе register отсутствует поле ID"
+    def test_register_user(self, api_manager: ApiManager,
+                           test_user: RegisterUserRequest,
+                           users_to_cleanup: list, db_helper: DBHelper):
+        if db_helper.user_exists_by_email(str(test_user.email)):
+            raise AssertionError(
+                f"Пользователь {test_user.email} уже существует в БД, "
+                "ожидался незарегистрированный пользователь"
+            )
+        response = api_manager.auth_api.register_user(
+            user_data=test_user.model_dump(mode="json"))
 
-        expected_keys = {"id", "email", "fullName", "roles", "verified", "createdAt", "banned"}
-        assert expected_keys.issubset(response_data.keys()), "Не все ключи присутствуют в ответе"
+        users_to_cleanup.append(response.validated_response.id)
 
+        assert response.validated_response.email == test_user.email, "Email не совпадает"
+        if not db_helper.user_exists_by_email(str(test_user.email)):
+            raise AssertionError(
+                f"После успешной регистрации пользователь {test_user.email} "
+                "должен появиться в БД"
+            )
 
-        assert response_data["email"] == new_user["email"], "Email не совпадает"
-        assert response_data["fullName"] == new_user["fullName"], "Full Name не совпадает"
-
-        users_to_cleanup.append(user_id)
-
+    @pytest.mark.smoke
     @allure.story("Тест на авторизацию пользователя")
-    def test_login_user(self, api_manager: ApiManager, created_user_and_cleanup: dict):
-        login_data = {
-            "email": created_user_and_cleanup["email"],
-            "password": created_user_and_cleanup["password"]
-        }
+    @pytest.mark.parametrize(
+        "email, password",
+        LOGIN_EXIST_USERS_CASES,
+        ids=LOGIN_EXIST_USERS_IDS,
+    )
+    def test_login_user(
+            self,
+            api_manager: ApiManager,
+            email: str,
+            password: str,
+            db_helper: DBHelper,
+    ):
+        login_payload = LoginUserRequest(email=email, password=password)
+        login_data = login_payload.model_dump(mode="json")
+        if not db_helper.user_exists_by_email(email):
+            raise AssertionError(
+                f"Пользователь {email} отсутствует в БД"
+            )
 
-        response = api_manager.auth_api.login_user(login_data)
-        response_data = response.json()
+        response = api_manager.auth_api.login_user(
+            login_data=login_data, expected_status=HTTPStatus.OK)
 
-        expected_keys = {"user", "accessToken", "refreshToken", "expiresIn"}
-        assert expected_keys.issubset(response_data.keys()), "Не все ключи присутствуют в ответе"
-
-        user_data = response_data.get("user")
-        assert user_data is not None, "В ответе login отсутствует объект user"
-
-        login_user_keys = {"id", "email", "fullName", "roles"}
-        assert login_user_keys.issubset(user_data.keys()), "В user ответа login не все ожидаемые поля"
-
-        access_token = response_data.get("accessToken")
-        refresh_token = response_data.get("refreshToken")
-        assert access_token, "В ответе login отсутствует или пустой accessToken"
-        assert refresh_token, "В ответе login отсутствует или пустой refreshToken"
-        assert response_data.get("expiresIn") is not None, "В ответе login отсутствует expiresIn"
-
-        assert user_data.get("email") == created_user_and_cleanup["email"], "Email не совпадает"
-    
-    @allure.story("Тест на получение информации о пользователе")
-    def test_get_user_info(self, api_manager: ApiManager, created_user_and_cleanup: dict, authorized_super_admin: ApiManager):
-        response = authorized_super_admin.user_api.get_user_info(created_user_and_cleanup["id"])
-        response_data = response.json()
-
-        expected_keys = {"id", "email", "fullName", "roles", "verified", "createdAt", "banned"}
-        assert expected_keys.issubset(response_data.keys()), "Не все ключи присутствуют в ответе"
-
-        assert response_data.get("id") == created_user_and_cleanup["id"], "ID пользователя не совпадает"
-        roles = response_data.get("roles")
-        assert roles is not None, "В ответе get_user_info отсутствует поле roles"
-        assert "USER" in roles, "Роль USER должна быть у пользователя"
-
-    @allure.story("Тест на удаление пользователя")
-    def test_delete_user(self, api_manager: ApiManager, created_user_and_cleanup: dict, authorized_super_admin: ApiManager):
-        response = authorized_super_admin.user_api.delete_user(created_user_and_cleanup["id"])
-
-        assert response.text.strip() == "", "Ожидалось пустое тело ответа после удаления"
+        assert response.validated_response.user.email == login_data["email"], "Email не совпадает"

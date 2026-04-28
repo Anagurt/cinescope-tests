@@ -1,34 +1,26 @@
 from http import HTTPStatus
+from typing import Callable, Generator
 
 import pytest
 import requests
+from sqlalchemy.orm import Session
 
 from clients.api_manager import ApiManager
+from db_models.movies import MovieDBModel
+from db_models.user import UserDBModel
+from db_requester.db_client import get_db_session
+from db_requester.db_helpers import DBHelper
+from entities.location import Location
+from entities.roles import Roles
+from entities.user import User
+from models.base_model_movies import MovieInfoRequest, MovieInfoResponse
+from models.base_models_auth import RegisterUserRequest
+from resources.user_creds import RegularUserCreds, SuperAdminCreds
 from utils.data_generator import DataGenerator
 
 
-@pytest.fixture(scope="session")
-def session():
-    """
-    Фикстура для создания HTTP-сессии.
-    """
-    http_session = requests.Session()
-
-    yield http_session
-
-    http_session.close()
-
-
-@pytest.fixture(scope="session")
-def api_manager(session):
-    """
-    Фикстура для создания экземпляра ApiManager.
-    """
-    return ApiManager(session)
-
-
-@pytest.fixture()
-def anonymous_api_manager():
+@pytest.fixture
+def anonymous_api_manager() -> Generator[ApiManager, None, None]:
     """
     Фикстура для создания экземпляра ApiManager без заголовков авторизации
     """
@@ -39,152 +31,268 @@ def anonymous_api_manager():
         http_session.close()
 
 
-# AuthAPI фикстуры
-@pytest.fixture()
-def new_user():
-    random_email = DataGenerator.generate_random_email()
-    random_name = DataGenerator.generate_random_name()
-    random_password = DataGenerator.generate_random_password()
-
-    return {
-        "email": random_email,
-        "fullName": random_name,
-        "password": random_password,
-        "passwordRepeat": random_password,
-        "roles": ["USER"]
-    }
+@pytest.fixture
+def api_manager(anonymous_api_manager: ApiManager) -> ApiManager:
+    """Алиас для тестов, ожидающих имя фикстуры api_manager."""
+    return anonymous_api_manager
 
 
-@pytest.fixture(scope="session")
-def registered_user(api_manager: ApiManager):
+@pytest.fixture
+def user_session() -> Generator[Callable[[], ApiManager], None, None]:
     """
-    Фикстура для регистрации и получения данных зарегистрированного пользователя.
+    Фикстура для создания сессии юзера
     """
-    random_email = DataGenerator.generate_random_email()
-    random_name = DataGenerator.generate_random_name()
+    user_pool = []
+
+    def _create_user_session() -> ApiManager:
+        session = requests.Session()
+        user_session = ApiManager(session)
+        user_pool.append(user_session)
+        return user_session
+
+    yield _create_user_session
+
+    for user in user_pool:
+        user.close_session()
+
+
+@pytest.fixture
+def super_admin(user_session: Callable[[], ApiManager]) -> User:
+    """
+    Фикстура для создания супер-админа
+    """
+    new_session = user_session()
+
+    super_admin = User(SuperAdminCreds.ID, SuperAdminCreds.USERNAME,
+                       SuperAdminCreds.PASSWORD, [Roles.SUPER_ADMIN],
+                       new_session)
+
+    super_admin.api.auth_api.authenticate(super_admin.creds)
+    return super_admin
+
+
+@pytest.fixture
+def regular_user(user_session: Callable[[], ApiManager]) -> User:
+    """
+    Фикстура для создания обычного пользователя
+    """
+    new_session = user_session()
+
+    regular_user = User(RegularUserCreds.ID, RegularUserCreds.USERNAME,
+                        RegularUserCreds.PASSWORD, [Roles.USER], new_session)
+
+    regular_user.api.auth_api.authenticate(regular_user.creds)
+    return regular_user
+
+
+@pytest.fixture
+def test_user() -> RegisterUserRequest:
+    """
+    Фикстура для генерации данных для нового пользователя «сырье»
+    """
     random_password = DataGenerator.generate_random_password()
-    user_data = {
-        "email": random_email,
-        "fullName": random_name,
-        "password": random_password,
-        "passwordRepeat": random_password,
-        "roles": ["USER"]
-    }
-
-    response = api_manager.auth_api.register_user(user_data, expected_status=HTTPStatus.CREATED)
-    response_data = response.json()
-    user = user_data.copy()
-    user["id"] = response_data["id"]
-    return user
+    return RegisterUserRequest(email=DataGenerator.generate_random_email(),
+                               fullName=DataGenerator.generate_random_name(),
+                               password=random_password,
+                               passwordRepeat=random_password,
+                               roles=[Roles.USER])
 
 
-@pytest.fixture(scope="session")
-def authorized_registered_user(api_manager: ApiManager, registered_user: dict):
-    api_manager.auth_api.authenticate((registered_user["email"], registered_user["password"]))
+@pytest.fixture
+def creation_user_data(test_user: RegisterUserRequest) -> RegisterUserRequest:
+    """
+    Фикстура для генерации данных для нового пользователя (объект класса User)
+    """
+    updated_data = test_user.model_dump(mode="json")
+    updated_data.update({"verified": True, "banned": False})
+    return RegisterUserRequest.model_validate(updated_data)
+# ______________
 
-    return api_manager
+@pytest.fixture
+def common_user(
+        user_session: Callable[[], ApiManager],
+        super_admin: User,
+        creation_user_data: RegisterUserRequest,
+        db_helper: DBHelper,
+) -> Generator[User, None, None]:
+    """
+    Фикстура для создания обычного пользователя (объект класса User)
+    """
+
+    new_session = user_session()
+
+    create_response = super_admin.api.user_api.create_user(creation_user_data)
+    user_id = create_response.json()["id"]
+
+    common_user = User(user_id, creation_user_data.email,
+                       creation_user_data.password, [Roles.USER], new_session)
+
+    common_user.api.auth_api.authenticate(common_user.creds)
+
+    yield common_user
+
+    super_admin.api.auth_api.authenticate()
+    if db_helper.get_user_by_id(str(user_id)):
+        delete_response = super_admin.api.user_api.delete_user(
+            user_id, expected_status=None)
+        _expect_http_ok(
+            delete_response,
+            f"удаление пользователя {user_id} после теста",
+        )
 
 
-@pytest.fixture(scope="session")
-def authorized_super_admin(api_manager: ApiManager):
-    api_manager.auth_api.authenticate()
-
-    return api_manager
-
-
-def _delete_ok_or_gone(response: requests.Response, context: str):
-    if response.status_code in (HTTPStatus.OK, HTTPStatus.NOT_FOUND):
+def _expect_http_ok(response: requests.Response, context: str) -> None:
+    if response.status_code == HTTPStatus.OK:
         return
-
     raise RuntimeError(
         f"{context}: unexpected status {response.status_code}, body: {response.text!r}"
     )
 
 
-@pytest.fixture()
-def created_user_and_cleanup(api_manager: ApiManager, authorized_super_admin: ApiManager, new_user: dict):
-    response = api_manager.auth_api.register_user(new_user, expected_status=HTTPStatus.CREATED)
-    response_data = response.json()
-
-    created_user = new_user.copy()
-    created_user["id"] = response_data["id"]
-
-    yield created_user
-
-    authorized_super_admin.auth_api.authenticate()
-
-    response = authorized_super_admin.user_api.delete_user(
-        created_user["id"],
-        expected_status=None,
-    )
-    _delete_ok_or_gone(response, "delete user")
-
-
-@pytest.fixture()
-def users_to_cleanup(authorized_super_admin: ApiManager):
+@pytest.fixture
+def users_to_cleanup(
+        super_admin: User,
+        db_helper: DBHelper,
+) -> Generator[list[str], None, None]:
     created_user_ids = []
 
     yield created_user_ids
 
-    authorized_super_admin.auth_api.authenticate()
+    super_admin.api.auth_api.authenticate()
+    for user_id in dict.fromkeys(created_user_ids):
+        if not db_helper.get_user_by_id(str(user_id)):
+            continue
+        response = super_admin.api.user_api.delete_user(
+            user_id, expected_status=None)
+        _expect_http_ok(
+            response,
+            f"delete user {user_id} in users_to_cleanup",
+        )
 
-    for user_id in created_user_ids:
-        response = authorized_super_admin.user_api.delete_user(user_id, expected_status=None)
-        _delete_ok_or_gone(response, f"delete user {user_id} in users_to_cleanup")
-
-
+# _______________________________________________________________________________
 # Фикстуры для MoviesAPI
-@pytest.fixture()
-def movie_data():
+
+
+@pytest.fixture
+def movie_data() -> MovieInfoRequest:
     """
     Фикстура для генерации случайного фильма.
     """
-    return {
-        "name": DataGenerator.generate_random_name_movie(),
-        "imageUrl": "https://example.com/image.png",
-        "price": DataGenerator.generate_random_price_movie(),
-        "description": DataGenerator.generate_random_description_movie(),
-        "location": "SPB",
-        "published": True,
-        "genreId": 1,
-    }
+
+    return MovieInfoRequest(
+        name=DataGenerator.generate_random_name_movie(),
+        imageUrl="https://example.com/image.png",
+        price=DataGenerator.generate_random_price_movie(),
+        description=DataGenerator.generate_random_description_movie(),
+        location=Location.SPB,
+        published=True,
+        genreId=1,
+    )
 
 
-@pytest.fixture()
-def created_movie_and_cleanup(authorized_super_admin: ApiManager, movie_data: dict):
+@pytest.fixture
+def created_movie_and_cleanup(
+        super_admin: User, movie_data: MovieInfoRequest,
+        db_helper: DBHelper,
+) -> Generator[MovieInfoResponse, None, None]:
     """
     Фикстура для создания фильма и удаления его после теста.
     """
-    authorized_super_admin.auth_api.authenticate()
 
-    response = authorized_super_admin.movies_api.post_movie(movie_data, expected_status=HTTPStatus.CREATED)
-    response_data = response.json()
+    super_admin.api.auth_api.authenticate()
 
-    created_movie = movie_data.copy()
-    created_movie["id"] = response_data["id"]
+    response = super_admin.api.movies_api.post_movie(
+        movie_data, expected_status=HTTPStatus.CREATED)
 
-    yield created_movie
+    created = response.validated_response
 
-    authorized_super_admin.auth_api.authenticate()
+    yield created
 
-    response = authorized_super_admin.movies_api.delete_movie(
-        created_movie["id"],
+    super_admin.api.auth_api.authenticate()
+    if not db_helper.get_movie_by_id(created.id):
+        return
+    response = super_admin.api.movies_api.delete_movie(
+        created.id,
         expected_status=None,
     )
-    _delete_ok_or_gone(response, "delete movie")
+    _expect_http_ok(response, "delete movie")
 
 
-@pytest.fixture(scope="session")
-def movies_to_cleanup(authorized_super_admin: ApiManager):
+@pytest.fixture
+def movies_to_cleanup(
+        super_admin: User,
+        db_helper: DBHelper,
+) -> Generator[list[int], None, None]:
     """
     Список id фильмов на удаление в конце сессии для подчистки фильмов с меткой в name.
     """
+
     created_movie_ids = []
 
     yield created_movie_ids
 
-    authorized_super_admin.auth_api.authenticate()
-
+    super_admin.api.auth_api.authenticate()
     for movie_id in dict.fromkeys(created_movie_ids):
-        response = authorized_super_admin.movies_api.delete_movie(movie_id, expected_status=None)
-        _delete_ok_or_gone(response, f"delete movie {movie_id} in movies_to_cleanup")
+        if not db_helper.get_movie_by_id(movie_id):
+            continue
+        response = super_admin.api.movies_api.delete_movie(
+            movie_id, expected_status=None)
+        _expect_http_ok(
+            response,
+            f"delete movie {movie_id} in movies_to_cleanup",
+        )
+
+
+# Фикстуры для работы с БД (SQLAlchemy)
+
+
+@pytest.fixture(scope="module")
+def db_session() -> Generator[Session, None, None]:
+    """
+    Фикстура, которая создает и возвращает сессию для работы с базой данных
+    После завершения тестов сессия автоматически закрывается
+    """
+    db_session = get_db_session()
+
+    yield db_session
+
+    db_session.close()
+
+
+@pytest.fixture
+def db_helper(db_session: Session) -> DBHelper:
+    """
+    Фикстура для экземпляра хелпера
+    """
+    db_helper = DBHelper(db_session)
+    return db_helper
+
+
+@pytest.fixture
+def created_test_user(db_helper: DBHelper) -> Generator[UserDBModel, None, None]:
+    """
+    Фикстура, которая создает тестового пользователя в БД
+    и удаляет его после завершения теста
+    """
+
+    user = db_helper.create_test_user(DataGenerator.generate_user_data())
+
+    yield user
+
+    if db_helper.get_user_by_id(user.id):
+        db_helper.delete_user(user)
+
+
+@pytest.fixture
+def created_test_movie(db_helper: DBHelper) -> Generator[MovieDBModel, None, None]:
+    """
+    Фикстура, которая создает тестовый фильм в БД
+    и удаляет его после завершения теста
+    """
+
+    movie = db_helper.create_movie(DataGenerator.generate_movie_data())
+
+    yield movie
+
+    if db_helper.get_movie_by_id(movie.id):
+        db_helper.delete_movie(movie)

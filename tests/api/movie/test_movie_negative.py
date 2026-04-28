@@ -1,93 +1,248 @@
 from http import HTTPStatus
+from http.client import responses
 
 import allure
 import pytest
 
+from models.base_model_movies import MovieInfoRequest
 from clients.api_manager import ApiManager
+from db_requester.db_helpers import DBHelper
+from tests.constants.movie_cases import (
+    INVALID_GET_MOVIES_PARAMS_CASES,
+    INVALID_GET_MOVIES_PARAMS_IDS,
+    INVALID_MOVIE_FIELDS_CASES,
+    INVALID_MOVIE_FIELDS_IDS,
+    MOVIE_METHODS_CASES,
+    MOVIE_METHODS_IDS,
+    ADMIN_AND_REGULAR_USER_CASES,
+    ADMIN_AND_REGULAR_USER_IDS,
+)
+from constants import MovieMethods, MovieConstants
 
 
 @allure.feature("Негативные тесты для movies API")
 class TestMoviesAPINegative:
-    @allure.story("Негативный тест на получение списка афиш фильмов с некорректным параметром page")
-    def test_movies_with_invalid_page(self, api_manager: ApiManager):
-        api_manager.movies_api.get_movies(params={"page": -1}, expected_status=HTTPStatus.BAD_REQUEST)
 
-    @allure.story("Негативный тест на получение списка афиш фильмов с некорректным параметром createdAt")
-    def test_movies_with_invalid_created_at(self, api_manager: ApiManager):
-        api_manager.movies_api.get_movies(params={"createdAt": "wrong"}, expected_status=HTTPStatus.BAD_REQUEST)
+    @pytest.mark.smoke
+    @pytest.mark.negative
+    @allure.story(
+        "Негативный тест на получение списка афиш фильмов "
+        "с некорректными параметрами (под неавторизованным пользователем)"
+    )
+    @pytest.mark.parametrize(
+        "params",
+        INVALID_GET_MOVIES_PARAMS_CASES,
+        ids=INVALID_GET_MOVIES_PARAMS_IDS,
+    )
+    def test_movies_with_invalid_params_unauthorized_user(
+            self, anonymous_api_manager, params: dict):
+        anonymous_api_manager.movies_api.get_movies(
+            params=params, expected_status=HTTPStatus.BAD_REQUEST)
 
-    @allure.story("Негативный тест на получение информации о несуществующем фильме")
-    def test_get_nonexistent_movie(self, api_manager: ApiManager):
-        api_manager.movies_api.get_movie(999999999, expected_status=HTTPStatus.NOT_FOUND)
+    @pytest.mark.smoke
+    @pytest.mark.negative
+    @allure.story(
+        "Негативный тест на операции над несуществующим фильмом (под супер-админом)"
+    )
+    @pytest.mark.parametrize(
+        "operation",
+        MOVIE_METHODS_CASES,
+        ids=MOVIE_METHODS_IDS,
+    )
+    def test_operation_with_nonexistent_movie_super_admin(
+            self, super_admin, operation: str):
+        movie_id = 999999999
+        method = getattr(super_admin.api.movies_api, operation)
+        method(movie_id, expected_status=HTTPStatus.NOT_FOUND)
 
-    @allure.story("Негативный тест на создание афиши фильма с пустым полем name")
-    def test_create_invalid_movie_data(self, api_manager: ApiManager, authorized_super_admin: ApiManager):
-        invalid_movie_data = {
-            "name": "",
-            "imageUrl": "",
-            "price": -1,
-            "description": "",
-            "location": "",
-            "published": False,
-            "genreId": 0,
-        }
+    @pytest.mark.smoke
+    @pytest.mark.negative
+    @allure.story(
+        "Негативный тест на изменение несуществующего фильма (под супер-админом)"
+    )
+    def test_patch_nonexistent_movie_super_admin(
+            self, super_admin):
+        movie_id = 999999999
+        super_admin.api.movies_api.patch_movie(
+            movie_id,
+            MovieConstants.PATCH_MOVIE_DATA_NEGATIVE_CASES,
+            expected_status=HTTPStatus.NOT_FOUND
+        )
 
-        authorized_super_admin.movies_api.post_movie(invalid_movie_data, expected_status=HTTPStatus.BAD_REQUEST)
+    @pytest.mark.smoke
+    @pytest.mark.negative
+    @allure.story(
+        "Негативный тест на создание афиши фильма с некорректными данными")
+    @pytest.mark.parametrize(
+        "movie_data",
+        INVALID_MOVIE_FIELDS_CASES,
+        ids=INVALID_MOVIE_FIELDS_IDS,
+    )
+    def test_create_movie_with_invalid_fields(
+            self,
+            super_admin,
+            movie_data,
+            db_helper: DBHelper):
+        super_admin.api.movies_api.post_movie(
+            movie_data, expected_status=HTTPStatus.BAD_REQUEST)
 
-    @allure.story("Негативный тест на создание афиши фильма (под авторизованным пользователем)")
-    def test_create_movie_by_registered_user(self, authorized_registered_user: ApiManager, movie_data: dict):
-        authorized_registered_user.movies_api.post_movie(movie_data, expected_status=HTTPStatus.FORBIDDEN)
+        if db_helper.movie_exists_by_name(movie_data["name"]):
+            raise AssertionError(
+                f"Фильм {movie_data['name']} создан в БД, "
+                "ожидалось, что фильм не будет создан"
+            )
 
-    @allure.story("Негативный тест на создание афиши фильма с теми же данными, что и уже существующего")
-    def test_create_same_movie_duplicated(self, authorized_super_admin: ApiManager, created_movie_and_cleanup: dict):
-        authorized_super_admin.movies_api.post_movie(created_movie_and_cleanup, expected_status=HTTPStatus.CONFLICT)
+    @pytest.mark.smoke
+    @pytest.mark.negative
+    @allure.story(
+        "Негативный тест на создание афиши фильма "
+        "(под админом и авторизованным пользователем)"
+    )
+    @pytest.mark.parametrize(
+        "email, password",
+        ADMIN_AND_REGULAR_USER_CASES,
+        ids=ADMIN_AND_REGULAR_USER_IDS,
+    )
+    def test_create_movie_by_invalid_role_user(
+            self,
+            api_manager: ApiManager,
+            email: str,
+            password: str,
+            movie_data,
+            db_helper: DBHelper):
 
-    @allure.story("Негативный тест на изменение афиши фильма с некорректными данными")
-    def test_change_movie_with_invalid_data(self, authorized_super_admin: ApiManager, created_movie_and_cleanup: dict):
-        created_movie_id = created_movie_and_cleanup["id"]
-        invalid_movie_data = {
-            "name": "",
-            "imageUrl": "",
-            "price": -1,
-            "description": "",
-            "location": "",
-            "published": False,
-            "genreId": 0,
-        }
-            
-        authorized_super_admin.movies_api.patch_movie(created_movie_id, invalid_movie_data, expected_status=HTTPStatus.BAD_REQUEST)
+        api_manager.auth_api.authenticate((email, password))
+        api_manager.movies_api.post_movie(
+            movie_data, expected_status=HTTPStatus.FORBIDDEN)
 
-    @allure.story("Негативный тест на изменение афиши фильма с пустыми данными")
-    @pytest.mark.skip(reason="Баг в ответе API, ожидаемый ответ BAD_REQUEST, приходит NOT_FOUND")
-    def test_change_movie_with_empty_data(self, authorized_super_admin: ApiManager, created_movie_and_cleanup: dict):
-        created_movie_id = created_movie_and_cleanup["id"]
-        empty_name_movie_data = created_movie_and_cleanup
-        empty_name_movie_data["name"] = ""
+        if db_helper.movie_exists_by_name(movie_data.name):
+            raise AssertionError(
+                f"Фильм {movie_data.name} создан в БД, "
+                "ожидалось, что фильм не будет создан"
+            )
 
-        authorized_super_admin.movies_api.patch_movie(created_movie_id, empty_name_movie_data, expected_status=HTTPStatus.BAD_REQUEST)
+    @pytest.mark.smoke
+    @pytest.mark.negative
+    @allure.story(
+        "Негативный тест на удаление афиши фильма "
+        "(под админом и авторизованным пользователем)"
+    )
+    @pytest.mark.parametrize(
+        "email, password",
+        ADMIN_AND_REGULAR_USER_CASES,
+        ids=ADMIN_AND_REGULAR_USER_IDS,
+    )
+    def test_delete_movie_by_invalid_role_user(
+            self,
+            api_manager: ApiManager,
+            email: str,
+            password: str,
+            created_movie_and_cleanup,
+            db_helper: DBHelper,
+    ):
+        if not db_helper.get_movie_by_id(created_movie_and_cleanup.id):
+            raise AssertionError(
+                f"Фильм {created_movie_and_cleanup.id} отсутствует в БД"
+            )
 
-    @allure.story("Негативный тест на изменение афиши фильма (под пользователем)")
-    def test_change_movie_by_registered_user(self, authorized_registered_user: ApiManager, created_movie_and_cleanup, movie_data: dict, registered_user: dict):
-        created_movie_id = created_movie_and_cleanup["id"]
+        api_manager.auth_api.authenticate((email, password))
+        api_manager.movies_api.delete_movie(
+            created_movie_and_cleanup.id, expected_status=HTTPStatus.FORBIDDEN)
 
-        authorized_registered_user.auth_api.authenticate((registered_user["email"], registered_user["password"]))
+        if not db_helper.get_movie_by_id(created_movie_and_cleanup.id):
+            raise AssertionError(
+                f"Фильм {created_movie_and_cleanup.id} отсутствует в БД"
+            )
 
-        authorized_registered_user.movies_api.patch_movie(created_movie_id, movie_data, expected_status=HTTPStatus.FORBIDDEN)
+    @pytest.mark.smoke
+    @pytest.mark.negative
+    @allure.story(
+        "Негативный тест на изменение афиши фильма "
+        "(под админом и авторизованным пользователем)"
+    )
+    @pytest.mark.parametrize(
+        "email, password",
+        ADMIN_AND_REGULAR_USER_CASES,
+        ids=ADMIN_AND_REGULAR_USER_IDS,
+    )
+    def test_patch_movie_by_invalid_role_user(
+            self,
+            api_manager: ApiManager,
+            email: str,
+            password: str,
+            created_movie_and_cleanup,
+            db_helper: DBHelper,
+    ):
+        if not db_helper.get_movie_by_id(created_movie_and_cleanup.id):
+            raise AssertionError(
+                f"Фильм {created_movie_and_cleanup.id} отсутствует в БД"
+            )
 
-    @allure.story("Негативный тест на изменение информации о несуществующем фильме")
-    def test_change_nonexistent_movie(self, authorized_super_admin: ApiManager):
-        authorized_super_admin.movies_api.patch_movie(999999999, {"name": "Новый фильм"}, expected_status=HTTPStatus.NOT_FOUND)
+        api_manager.auth_api.authenticate((email, password))
+        change_movie_data = MovieInfoRequest(
+            **MovieConstants.PATCH_MOVIE_DATA_NEGATIVE_CASES
+        )
+        api_manager.movies_api.patch_movie(
+            created_movie_and_cleanup.id,
+            change_movie_data.model_dump(mode="json"),
+            expected_status=HTTPStatus.FORBIDDEN)
 
-    @allure.story("Негативный тест на удаление афиши фильма (под пользователем)")
-    def test_delete_movie_by_registered_user(self, created_movie_and_cleanup: dict, authorized_registered_user: ApiManager, registered_user: dict):
-        created_movie_id = created_movie_and_cleanup["id"]
+        if not db_helper.movie_exists_by_name(created_movie_and_cleanup.name):
+            raise AssertionError(
+                f"Фильм с названием {created_movie_and_cleanup.name} отсутствует в БД"
+            )
 
-        authorized_registered_user.auth_api.authenticate((registered_user["email"], registered_user["password"]))
+    @pytest.mark.smoke
+    @pytest.mark.negative
+    @allure.story(
+        "Негативный тест на создание афиши фильма "
+        "с теми же данными, что и уже существующего"
+    )
+    def test_create_same_movie_duplicated(
+            self,
+            super_admin,
+            created_movie_and_cleanup,
+            db_helper: DBHelper,
+        ):
+        movie_data = MovieInfoRequest(
+            name=created_movie_and_cleanup.name,
+            imageUrl=created_movie_and_cleanup.imageUrl,
+            price=created_movie_and_cleanup.price,
+            description=created_movie_and_cleanup.description,
+            location=created_movie_and_cleanup.location,
+            published=created_movie_and_cleanup.published,
+            genreId=created_movie_and_cleanup.genreId,
+        )
+        super_admin.api.movies_api.post_movie(
+            movie_data, expected_status=HTTPStatus.CONFLICT)
 
-        authorized_registered_user.movies_api.delete_movie(created_movie_id, expected_status=HTTPStatus.FORBIDDEN)
+        if db_helper.movie_count_by_name(created_movie_and_cleanup.name) != 1:
+            raise AssertionError(
+                f"Фильмов с названием {created_movie_and_cleanup.name} "
+                "в БД больше одного"
+            )
 
-    @allure.story("Негативный тест на удаление афиши несуществующего фильма")
-    def test_delete_nonexistent_movie(self, authorized_super_admin: ApiManager):
-        authorized_super_admin.auth_api.authenticate()
+    @allure.story(
+        "Негативный тест на изменение афиши фильма с пустыми данными")
+    @pytest.mark.parametrize(
+        "change_movie_data",
+        INVALID_MOVIE_FIELDS_CASES,
+        ids=INVALID_MOVIE_FIELDS_IDS,
+    )
+    def test_change_movie_with_invalid_fields(
+            self,
+            super_admin,
+            change_movie_data,
+            created_movie_and_cleanup,
+            db_helper: DBHelper,
+    ):
+        super_admin.api.movies_api.patch_movie(
+            created_movie_and_cleanup.id,
+            change_movie_data,
+            expected_status=HTTPStatus.BAD_REQUEST)
 
-        authorized_super_admin.movies_api.delete_movie(999999999, expected_status=HTTPStatus.NOT_FOUND)
+        if db_helper.movie_exists_by_name(change_movie_data["name"]):
+            raise AssertionError(
+                f"Название фильма изменилось на {change_movie_data['name']} в БД, "
+                "ожидалось, что название фильма не будет изменено"
+            )

@@ -1,14 +1,25 @@
-from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
 
 import allure
+import pytest
 
 from clients.api_manager import ApiManager
+from constants import MovieConstants
+from db_requester.db_helpers import DBHelper
+from entities.location import Location
+from models.base_model_movies import (
+    MovieInfoRequest,
+    MovieInfoResponse,
+)
+from tests.constants.auth_cases import LOGIN_EXIST_USERS_CASES, LOGIN_EXIST_USERS_IDS
+from utils.data_generator import DataGenerator
 
 
-def _assert_create_movie_echoes_request(movie_data: dict, response_data: dict):
+def _assert_create_movie_echoes_request(movie_data: dict,
+                                        response_data: dict) -> None:
     """
-    Сравнивает поля запроса с телом ответа (при расхождении сообщение указывает конкретный ключ)
+    Сравнивает поля запроса с телом ответа.
+    При расхождении сообщение указывает конкретный ключ.
     """
     mismatches = []
     for key in movie_data:
@@ -18,88 +29,142 @@ def _assert_create_movie_echoes_request(movie_data: dict, response_data: dict):
         expected = movie_data[key]
         actual = response_data[key]
         if actual != expected:
-            mismatches.append(f"{key}: ожидалось {expected!r}, в ответе {actual!r}")
-    assert not mismatches, "Поля create_movie не совпадают с запросом:\n" + "\n".join(mismatches)
+            mismatches.append(
+                f"{key}: ожидалось {expected!r}, в ответе {actual!r}")
+    assert not mismatches, "Поля create_movie не совпадают с запросом:\n" + "\n".join(
+        mismatches)
 
 
 @allure.feature("Позитивные тесты для movies API")
 class TestMoviesAPIPositive:
-    @allure.story("Тест на получение списка афиш фильмов (под неавторизованным пользователем)")
-    def test_get_movies_unauthorized_user(self, anonymous_api_manager: ApiManager):
-        response = anonymous_api_manager.movies_api.get_movies()
-        response_data = response.json()
 
-        assert "movies" in response_data, "Отсутствие списков фильмов в ответе"
+    @pytest.mark.smoke
+    @allure.story(
+        "Тест на получение списка афиш фильмов с параметром диапазон цен "
+        "(под неавторизованным пользователем)"
+    )
+    def test_get_movies_with_range_price_unauthorized_user(
+            self, anonymous_api_manager):
+        response = anonymous_api_manager.movies_api.get_movies(
+            params=MovieConstants.RANGE_PRICE_PARAMS,
+        )
 
+        min_price = MovieConstants.RANGE_PRICE_PARAMS["minPrice"]
+        max_price = MovieConstants.RANGE_PRICE_PARAMS["maxPrice"]
+        assert all(
+            min_price <= movie.price <= max_price
+            for movie in response.validated_response.movies
+        ), "Цена не совпадает"
+
+    @pytest.mark.smoke
+    @allure.story(
+        "Тест на получение списка афиш фильмов с параметром локация "
+        "(под неавторизованным пользователем)"
+    )
+    def test_get_movies_with_location_unauthorized_user(
+            self, anonymous_api_manager):
+        response = anonymous_api_manager.movies_api.get_movies(
+            params=MovieConstants.LOCATION_PARAMS,
+        )
+
+        expected_location = MovieConstants.LOCATION_PARAMS["locations"]
+        assert all(
+            movie.location == expected_location
+            for movie in response.validated_response.movies
+        ), "Локация не совпадает"
+
+    @pytest.mark.smoke
+    @allure.story(
+        "Тест на получение списка афиш фильмов с параметром жанр "
+        "(под неавторизованным пользователем)"
+    )
+    def test_get_movies_with_genre_id_unauthorized_user(
+            self, anonymous_api_manager):
+        response = anonymous_api_manager.movies_api.get_movies(
+            params=MovieConstants.GENRE_ID_PARAMS,
+        )
+
+        expected_genre_id = MovieConstants.GENRE_ID_PARAMS["genreId"]
+        assert all(
+            movie.genreId == expected_genre_id
+            for movie in response.validated_response.movies
+        ), "Жанр не совпадает"
+
+    @pytest.mark.smoke
     @allure.story("Тест на создание афиши фильма (под админскими правами)")
-    def test_create_movie_by_super_admin(self, movie_data: dict, authorized_super_admin: ApiManager, movies_to_cleanup: list):
-        response = authorized_super_admin.movies_api.post_movie(movie_data)
-        response_data = response.json()
+    def test_create_movie_by_super_admin(self, movie_data: MovieInfoRequest,
+                                         super_admin, movies_to_cleanup: list,
+                                         db_helper: DBHelper):
 
-        movie_id = response_data.get("id")
-        assert movie_id is not None, f"У только что созданного фильма с name={movie_data['name']} в ответе отсутствует id"
+        response = super_admin.api.movies_api.post_movie(
+            movie_data, expected_status=HTTPStatus.CREATED)
+        created = response.validated_response
 
-        _assert_create_movie_echoes_request(movie_data, response_data)
+        _assert_create_movie_echoes_request(
+            movie_data.model_dump(mode="json"),
+            created.model_dump(mode="json"),
+        )
 
-        movies_to_cleanup.append(movie_id)
+        if not db_helper.movie_exists_by_name(movie_data.name):
+            raise AssertionError(
+                f"Фильм {movie_data.name} отсутствует в БД, "
+                "ожидалось, что фильм будет создан в БД"
+            )
 
-    @allure.story("Тест на получение информации о созданной афише фильма (под админскими правами)")
-    def test_get_movie_by_super_admin(self, created_movie_and_cleanup: dict, authorized_super_admin: ApiManager):
-        response = authorized_super_admin.movies_api.get_movie(created_movie_and_cleanup["id"])
-        response_data = response.json()
+        movies_to_cleanup.append(created.id)
 
-        response_id = response_data.get("id")
-        assert response_id is not None, f"В ответе get_movie созданного фильма с name={created_movie_and_cleanup['name']} отсутствует id"
-        assert created_movie_and_cleanup["id"] == response_id, f"id фильма не совпадает, ожидалось {created_movie_and_cleanup['id']}, в ответе {response_id}"
-        expected_keys = {"id", "name", "price", "description", "imageUrl", "location", "published", "genreId", "createdAt", "rating", "reviews"}
-        assert expected_keys.issubset(response_data.keys()), "Не все ключи присутствуют в ответе"
+    @pytest.mark.smoke
+    @allure.story("Тест на получение информации о созданной афише фильма")
+    @pytest.mark.parametrize(
+        "email, password",
+        LOGIN_EXIST_USERS_CASES,
+        ids=LOGIN_EXIST_USERS_IDS,
+    )
+    def test_get_movie_by_id(self,
+                             created_movie_and_cleanup: MovieInfoResponse,
+                             email, password,
+                             db_helper: DBHelper, api_manager: ApiManager,
+        ):
 
-        created_at_raw = response_data.get("createdAt")
-        assert created_at_raw is not None, "В ответе get_movie отсутствует поле createdAt"
-        created_at = datetime.fromisoformat(created_at_raw.replace("Z", "+00:00"))
-        assert abs(datetime.now(timezone.utc) - created_at) <= timedelta(seconds=2), "Дата создания фильма отличается от текущего времени больше чем на 2 секунды"
+        api_manager.auth_api.authenticate((email, password))
+        response = api_manager.movies_api.get_movie(
+            created_movie_and_cleanup.id, expected_status=HTTPStatus.OK)
 
-    @allure.story("Тест на получение информации о созданной афише фильма (под авторизованным пользователем)")
-    def test_get_movie_by_registered_user(self, created_movie_and_cleanup: dict, authorized_super_admin: ApiManager, authorized_registered_user: ApiManager):
-        response = authorized_super_admin.movies_api.get_movie(created_movie_and_cleanup["id"])
-        created_movie_id = response.json().get("id")
-        assert created_movie_id is not None, "В ответе get_movie (admin) отсутствует поле id"
+        assert response.validated_response.id == created_movie_and_cleanup.id, "ID не совпадает"
 
-        response = authorized_registered_user.movies_api.get_movie(created_movie_id)
-        get_movie_data = response.json()
-
-        get_id = get_movie_data.get("id")
-        assert get_id is not None, f"В ответе get_movie созданного фильма с id={created_movie_id} отсутствует поле id"
-        assert created_movie_id == get_id, f"id фильма не совпадает, ожидалось {created_movie_id}, в ответе {get_id}"
-        expected_keys = {"id", "name", "price", "description", "imageUrl", "location", "published", "genreId", "createdAt", "rating", "reviews"}
-        assert expected_keys.issubset(get_movie_data.keys()), "Не все ключи присутствуют в ответе"
-
-        created_at_raw = get_movie_data.get("createdAt")
-        assert created_at_raw is not None, "Поле createdAt в ответе отсутствует или null"
-        created_at = datetime.fromisoformat(created_at_raw.replace("Z", "+00:00"))
-        assert abs(datetime.now(timezone.utc) - created_at) <= timedelta(seconds=2), "Дата создания фильма отличается от текущего времени больше чем на 2 секунды"
-
+    @pytest.mark.smoke
     @allure.story("Тест на изменение афиши фильма (под админскими правами)")
-    def test_change_movie_by_super_admin(self, created_movie_and_cleanup: dict, authorized_super_admin: ApiManager):
-        created_movie_id = created_movie_and_cleanup["id"]
-        change_movie_data = created_movie_and_cleanup.copy()
+    def test_change_movie_by_super_admin(
+            self,
+            created_movie_and_cleanup: MovieInfoResponse,
+            super_admin,
+            db_helper: DBHelper,
+        ):
+        change_movie_data = MovieInfoRequest(
+            name=DataGenerator.generate_random_name_movie(),
+            imageUrl="https://example.com/image.png",
+            price=DataGenerator.generate_random_price_movie(),
+            description=DataGenerator.generate_random_description_movie(),
+            location=Location.SPB,
+            published=True,
+            genreId=2,
+        )
+        response = super_admin.api.movies_api.patch_movie(
+            created_movie_and_cleanup.id,
+            change_movie_data.model_dump(mode="json"),
+            expected_status=HTTPStatus.OK)
 
-        new_name = "Новый фильм"
-        change_movie_data["name"] = new_name
+        assert response.validated_response.id == created_movie_and_cleanup.id, "ID не совпадает"
+        assert db_helper.movie_exists_by_name(response.validated_response.name), "Фильм не создан в БД"
 
-        response_changed_movie = authorized_super_admin.movies_api.patch_movie(created_movie_id, change_movie_data)
-        changed_movie_data = response_changed_movie.json()
-
-        changed_id = changed_movie_data.get("id")
-        assert changed_id is not None, f"В ответе patch_movie созданного фильма с id={created_movie_id} отсутствует поле ID"
-        assert created_movie_id == changed_id, f"id фильма не совпадает, ожидалось {created_movie_id}, в ответе {changed_id}"
-        assert created_movie_and_cleanup["name"] != changed_movie_data["name"], "Название фильма совпадает с измененным"
-
+    @pytest.mark.smoke
     @allure.story("Тест на удаление афиши фильма (под админскими правами)")
-    def test_delete_movie_by_super_admin(self, movie_data: dict, authorized_super_admin: ApiManager):    
-        response = authorized_super_admin.movies_api.post_movie(movie_data)
-        created_movie_id = response.json().get("id")
-        assert created_movie_id is not None, "В ответе get_movie отсутствует поле id"
+    def test_delete_movie_by_super_admin(
+            self, created_movie_and_cleanup: MovieInfoResponse, super_admin,
+            db_helper: DBHelper):
+        response = super_admin.api.movies_api.delete_movie(
+            created_movie_and_cleanup.id, expected_status=HTTPStatus.OK)
 
-        authorized_super_admin.movies_api.delete_movie(created_movie_id)
-        authorized_super_admin.movies_api.get_movie(created_movie_id, expected_status=HTTPStatus.NOT_FOUND)
+        assert response.validated_response.id == created_movie_and_cleanup.id, "ID не совпадает"
+        assert not db_helper.movie_exists_by_name(created_movie_and_cleanup.name), "Фильм не удален из БД"
+       
