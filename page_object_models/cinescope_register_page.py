@@ -1,5 +1,4 @@
-import allure
-from playwright.sync_api import Page, expect
+from playwright.sync_api import Page
 from page_object_models.base_page import BasePage
 
 class CinescopeRegisterPage(BasePage):

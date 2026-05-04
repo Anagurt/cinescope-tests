@@ -7,7 +7,7 @@ from playwright.sync_api import Page
 from db_requester.db_helpers import DBHelper
 from entities.user import User
 from models.base_models_auth import RegisterUserRequest
-from page_object_models import PageAction, BasePage, CinescopeRegisterPage, CinescopeLoginPage
+from page_object_models import PageAction, BasePage, CinescopeRegisterPage, CinescopeLoginPage, CinescopeMoviesPage, CinescopeMovieDetailsPage
 
 LONG_UI_TIMEOUT = 30000
 SHORT_UI_TIMEOUT = 5000
@@ -55,6 +55,14 @@ def register_page(page: Page) -> CinescopeRegisterPage:
 @pytest.fixture
 def login_page(page: Page) -> CinescopeLoginPage:
     return CinescopeLoginPage(page)
+
+@pytest.fixture
+def movies_page(page: Page) -> CinescopeMoviesPage:
+    return CinescopeMoviesPage(page)
+
+@pytest.fixture
+def movie_details_page(page: Page) -> CinescopeMovieDetailsPage:
+    return CinescopeMovieDetailsPage(page)
 
 
 @pytest.fixture
