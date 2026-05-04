@@ -7,7 +7,7 @@ from playwright.sync_api import Page
 from db_requester.db_helpers import DBHelper
 from entities.user import User
 from models.base_models_auth import RegisterUserRequest
-from page_object_models import CinescopeHeader, CinescopeRegisterPage, CinescopeLoginPage
+from page_object_models import PageAction, BasePage, CinescopeRegisterPage, CinescopeLoginPage
 
 LONG_UI_TIMEOUT = 30000
 SHORT_UI_TIMEOUT = 5000
@@ -40,10 +40,13 @@ def page(context):
     yield page  # yield возвращает значение фикстуры, выполнение теста продолжится после yield
     page.close()  # Страница закрывается после завершения теста
 
+@pytest.fixture
+def page_action(page: Page) -> PageAction:
+    return PageAction(page)
 
 @pytest.fixture
-def header(page: Page) -> CinescopeHeader:
-    return CinescopeHeader(page)
+def base_page(page: Page) -> BasePage:
+    return BasePage(page)
 
 @pytest.fixture
 def register_page(page: Page) -> CinescopeRegisterPage:

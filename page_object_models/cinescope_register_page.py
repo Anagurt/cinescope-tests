@@ -1,11 +1,10 @@
 import allure
 from playwright.sync_api import Page, expect
-from page_object_models.cinescope_header import CinescopeHeader
+from page_object_models.base_page import BasePage
 
-class CinescopeRegisterPage:
+class CinescopeRegisterPage(BasePage):
     def __init__(self, page: Page):
-        self.header = CinescopeHeader(page)
-        self.page = page
+        super().__init__(page)
         self.url = "/register"
         # Локаторы элементов
         self.register_title = page.get_by_role('heading', name="Регистрация")
@@ -44,40 +43,31 @@ class CinescopeRegisterPage:
         self.register_button = page.get_by_role("button", name="Зарегистрироваться")
         self.register_to_login_button = page.locator("form").get_by_role("link", name="Войти")
 
-    @allure.step("Переход на страницу регистрации")
     def open(self):
-        self.page.goto(self.url)
+        self.open_url(self.url)
 
-    @allure.step("Ввод ФИО")
     def input_name(self, name: str):
-        self.register_name_input.fill(name)
+        self.input_text_to_element(self.register_name_input, name, "ФИО")
 
-    @allure.step("Ввод email")
     def input_email(self, email: str):
-        self.register_email_input.fill(email)
+        self.input_text_to_element(self.register_email_input, email, "Email")
 
-    @allure.step("Ввод пароля")
     def input_password(self, password: str):
-        self.register_password_input.fill(password)
+        self.input_text_to_element(self.register_password_input, password, "Пароль")
 
-    @allure.step("Ввод повторного пароля")
     def input_password_repeat(self, password: str):
-        self.register_password_repeat_input.fill(password)
+        self.input_text_to_element(self.register_password_repeat_input, password, "Повторный пароль")
 
-    @allure.step("Нажатие кнопки регистрации")
     def click_register_button(self):
-        self.register_button.click()
+        self.click_on_element(self.register_button, "Кнопка регистрации")
     
-    @allure.step("Переход на страницу логина")
     def click_login_button(self):
-        self.register_to_login_button.click()
+        self.click_on_element(self.register_to_login_button, "Ссылка на страницу логина")
 
-    @allure.step("Наведение на требования и проверка тултипа")
     def hover_requirements_button(self):
-        self.register_requirements_button.hover()
-        expect(self.password_requirements_tooltip).to_be_visible()
+        self.hover_on_element(self.register_requirements_button, "Требования к паролю")
+        self.wait_for_element(self.password_requirements_tooltip, "visible", "Тултип требований к паролю")
 
-    @allure.step("Заполнение формы регистрации и отправка")
     def register(self, name: str, email: str, password: str, password_repeat: str):
         self.input_name(name)
         self.input_email(email)
@@ -85,33 +75,22 @@ class CinescopeRegisterPage:
         self.input_password_repeat(password_repeat)
         self.click_register_button()
 
-    @allure.step("Ожидание редиректа на страницу логина")
     def wait_redirect_to_login_page(self):
-        self.page.wait_for_url("https://dev-cinescope.coconutqa.ru/login")
-        assert self.page.url == "https://dev-cinescope.coconutqa.ru/login", "Редирект на домашнюю старницу не произошел"
+        self.wait_for_redirect_to_url("/login")
 
-
-    @allure.step("Проверка всплывающего сообщения о подтверждении почты")
     def check_alert_text(self):
-        notification_locator = self.page.get_by_text("Подтвердите свою почту")
-        notification_locator.wait_for(state="visible")
+        self.check_pop_up_element_with_text("Подтвердите свою почту")
 
-        assert notification_locator.is_visible(), "Уведомление не появилось"
-        notification_locator.wait_for(state="hidden")
-        assert notification_locator.is_visible() == False, "Уведомление исчезло"
-
-
-    @allure.step("Проверка отображения элементов на странице регистрации")
     def check_register_page_elements(self):
-        expect(self.register_title).to_be_visible()
-        expect(self.register_name_title).to_be_visible()
-        expect(self.register_name_placeholder).to_be_visible()
-        expect(self.register_email_title).to_be_visible()
-        expect(self.register_email_placeholder).to_be_visible()
-        expect(self.register_password_title).to_be_visible()
-        expect(self.register_password_placeholder).to_be_visible()
-        expect(self.register_password_repeat_title).to_be_visible()
-        expect(self.register_password_repeat_placeholder).to_be_visible()
-        expect(self.register_button).to_be_visible()
-        expect(self.register_requirements_button).to_be_visible()
-        expect(self.register_to_login_button).to_be_visible()
+        self.wait_for_element(self.register_title, "visible", "Заголовок страницы регистрации")
+        self.wait_for_element(self.register_name_title, "visible", "Заголовок поля ФИО")
+        self.wait_for_element(self.register_name_placeholder, "visible", "Placeholder поля ФИО")
+        self.wait_for_element(self.register_email_title, "visible", "Заголовок поля Email")
+        self.wait_for_element(self.register_email_placeholder, "visible", "Placeholder поля Email")
+        self.wait_for_element(self.register_password_title, "visible", "Заголовок поля Пароль")
+        self.wait_for_element(self.register_password_placeholder, "visible", "Placeholder поля Пароль")
+        self.wait_for_element(self.register_password_repeat_title, "visible", "Заголовок поля Повторите пароль")
+        self.wait_for_element(self.register_password_repeat_placeholder, "visible", "Placeholder поля Повторите пароль")
+        self.wait_for_element(self.register_button, "visible", "Кнопка регистрации")
+        self.wait_for_element(self.register_requirements_button, "visible", "Требования к паролю")
+        self.wait_for_element(self.register_to_login_button, "visible", "Ссылка на страницу логина")

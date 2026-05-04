@@ -2,7 +2,9 @@ import allure
 import pytest
 import time
 
-@allure.feature("Позитивные тесты для страницы регистрации")
+@allure.epic("Тестирование UI")
+@allure.feature("Тестирование Страницы Register")
+@pytest.mark.ui
 class TestRegisterPage:
 
     @pytest.mark.smoke

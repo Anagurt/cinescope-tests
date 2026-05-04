@@ -6,7 +6,9 @@ from resources.user_creds import RegularUserCreds
 
 
 
-@allure.feature("Позитивные тесты для страницы логина")
+@allure.epic("Тестирование UI")
+@allure.feature("Тестирование Страницы Login")
+@pytest.mark.ui
 class TestLoginPage:
 
     @pytest.mark.smoke

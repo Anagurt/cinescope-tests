@@ -1,11 +1,10 @@
 from playwright.sync_api import Page, expect
-from page_object_models.cinescope_header import CinescopeHeader
+from page_object_models.base_page import BasePage
 import allure
 
-class CinescopeLoginPage:
+class CinescopeLoginPage(BasePage):
     def __init__(self, page: Page):
-        self.header = CinescopeHeader(page)
-        self.page = page
+        super().__init__(page)
         self.url = "/login"
         # Локаторы элементов
         self.login_title = page.get_by_role("heading", name="Войти")
@@ -25,48 +24,34 @@ class CinescopeLoginPage:
         # сообщение об ошибке при вводе некорректных данных
         self.login_text_error = page.get_by_text("Неверная почта или пароль")
 
-    @allure.step("Переход на страницу логина")
     def open(self):
-        self.page.goto(self.url)
-        
-    @allure.step("Ввод email")
+        self.open_url(self.url)
+
     def input_email(self, email: str):
-        self.login_email_input.fill(email)
+        self.input_text_to_element(self.login_email_input, email, "Email")
 
-    @allure.step("Ввод пароля")
     def input_password(self, password: str):
-        self.login_password_input.fill(password)
+        self.input_text_to_element(self.login_password_input, password, "Пароль")
 
-    @allure.step("Нажатие кнопки логина")
     def click_login_button(self):
-        self.login_button.click()
+        self.click_on_element(self.login_button, "Кнопка логина")
 
-    @allure.step("Заполнение формы логина и отправка")
     def login(self, email: str, password: str):
         self.input_email(email)
         self.input_password(password)
         self.click_login_button()
     
-    @allure.step("Ожидание редиректа на домашнюю страницу")
     def wait_redirect_to_home_page(self):
-        self.page.wait_for_url("https://dev-cinescope.coconutqa.ru/")
-        assert self.page.url == "https://dev-cinescope.coconutqa.ru/", "Редирект на домашнюю старницу не произошел"
+        self.wait_for_redirect_to_url("/")
 
-    @allure.step("Проверка всплывающего сообщения после редиректа")
     def check_alert_text(self):
-        notification_locator = self.page.get_by_text("Вы вошли в аккаунт")
-        notification_locator.wait_for(state="visible")
-        assert notification_locator.is_visible(), "Уведомление не появилось"
-        
-        notification_locator.wait_for(state="hidden")
-        assert notification_locator.is_visible() == False, "Уведомление исчезло"
+        self.check_pop_up_element_with_text("Вы вошли в аккаунт")
 
-    @allure.step("Проверка отображения элементов на странице логина")
     def check_login_page_elements(self):
-        expect(self.login_title).to_be_visible()
-        expect(self.login_email_title).to_be_visible()
-        expect(self.login_email_placeholder).to_be_visible()
-        expect(self.login_password_title).to_be_visible()
-        expect(self.login_password_placeholder).to_be_visible()
-        expect(self.login_button).to_be_visible()
-        expect(self.login_to_register_button).to_be_visible()
+        self.wait_for_element(self.login_title, "visible", "Заголовок страницы логина")
+        self.wait_for_element(self.login_email_title, "visible", "Заголовок поля Email")
+        self.wait_for_element(self.login_email_placeholder, "visible", "Placeholder поля Email")
+        self.wait_for_element(self.login_password_title, "visible", "Заголовок поля Пароль")
+        self.wait_for_element(self.login_password_placeholder, "visible", "Placeholder поля Пароль")
+        self.wait_for_element(self.login_button, "visible", "Кнопка логина")
+        self.wait_for_element(self.login_to_register_button, "visible", "Ссылка на страницу регистрации")
